@@ -140,24 +140,77 @@ type ApiClient struct {
 	Timeout      bool
 	RxTxComplete bool
 	RSSI         int16
+
+	quit    chan bool
+	version chan Version
 }
 
 func NewApiClient() *ApiClient {
-	return &ApiClient{
-		serial: NewSerialClient(),
+	client := &ApiClient{
+		serial:  NewSerialClient(),
+		quit:    make(chan bool),
+		version: make(chan Version),
 	}
+
+	return client
 }
 
 func (c *ApiClient) Open(portName string) error {
-	return c.serial.Open(portName)
+	if c.serial.IsOpen() {
+		return errors.New("serial port already open")
+	}
+
+	err := c.serial.Open(portName)
+
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		fmt.Println("Starting message handler")
+
+		for {
+			select {
+			case <-c.quit:
+				return
+			default:
+				fmt.Println("Receiving message...")
+				msg, err := c.serial.ReceiveMessage()
+				if err != nil {
+					// Error receiving message (timeout?)
+					continue
+				}
+
+				fmt.Println("Handling message...")
+				err = c.handleMessage(msg)
+				if err != nil {
+					// Error handling message (invalid message?)
+					continue
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (c *ApiClient) Close() error {
-	return c.serial.Close()
+	if c.serial.IsOpen() {
+		c.quit <- true
+		return c.serial.Close()
+	}
+
+	return nil
 }
 
 func (c *ApiClient) handleMessage(message *Message) error {
 	switch message.Type {
+	case MSG_VERSION:
+		c.version <- Version{
+			Major: message.Payload[0],
+			Minor: message.Payload[1],
+			Patch: message.Payload[2],
+		}
 	case MSG_TIMEOUT:
 		c.Timeout = true
 		fmt.Print("Timeout\n")
@@ -232,17 +285,19 @@ func (c *ApiClient) GetVersion() (Version, error) {
 		return Version{}, err
 	}
 
-	resp, err := c.waitForResponse(MSG_VERSION)
-	if err != nil {
-		return Version{}, err
-	}
+	version := <-c.version
+	/*
+		resp, err := c.waitForResponse(MSG_VERSION)
+		if err != nil {
+			return Version{}, err
+		}
 
-	version := Version{
-		Major: resp.Payload[0],
-		Minor: resp.Payload[1],
-		Patch: resp.Payload[2],
-	}
-
+		version := Version{
+			Major: resp.Payload[0],
+			Minor: resp.Payload[1],
+			Patch: resp.Payload[2],
+		}
+	*/
 	return version, nil
 }
 

@@ -111,6 +111,10 @@ func (c *SerialClient) Close() error {
 	return nil
 }
 
+func (c *SerialClient) IsOpen() bool {
+	return c.port != nil
+}
+
 func (c *SerialClient) send(data []byte) error {
 	if c.port == nil {
 		return nil
