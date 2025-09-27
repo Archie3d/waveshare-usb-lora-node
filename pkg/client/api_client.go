@@ -174,14 +174,19 @@ func (c *ApiClient) Open(portName string) error {
 			case <-c.quit:
 				return
 			default:
-				fmt.Println("Receiving message...")
 				msg, err := c.serial.ReceiveMessage()
 				if err != nil {
-					// Error receiving message (timeout?)
-					continue
+
+					_, ok := err.(*TimeoutError)
+					if ok {
+						// Timeout - keep reading
+						continue
+					}
+
+					// Failure - terminate reading loop
+					return
 				}
 
-				fmt.Println("Handling message...")
 				err = c.handleMessage(msg)
 				if err != nil {
 					// Error handling message (invalid message?)

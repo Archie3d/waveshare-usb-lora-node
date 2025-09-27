@@ -4,6 +4,21 @@ This is a client code to talk to [Waveshare USB-to-LoRa custom firmware](https:/
 
 ## Generating protobufs
 
+Install Protocol Buffers compiler [as described here](https://protobuf.dev/installation/).
+
 ```shell
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+```
+Make sure `$HOME/go/bin` is in the `$PATH`.
+
+## Compiling
+```
 go generate ./...
+```
+
+## Using serial port
+On Linux the serial device may appear like `/dev/ttyACM0`.
+To allow a non-root access:
+```bash
+sudo usermod -aG dialout $USER
 ```

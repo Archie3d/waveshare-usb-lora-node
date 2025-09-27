@@ -1,7 +1,7 @@
 package client
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"go.bug.st/serial"
@@ -29,13 +29,14 @@ func escape(data []byte) []byte {
 	escaped := make([]byte, 0)
 
 	for _, b := range data {
-		if b == START {
+		switch b {
+		case START:
 			escaped = append(escaped, ESCAPE)
 			escaped = append(escaped, ESCAPE_START)
-		} else if b == ESCAPE {
+		case ESCAPE:
 			escaped = append(escaped, ESCAPE)
 			escaped = append(escaped, ESCAPE_ESCAPE)
-		} else {
+		default:
 			escaped = append(escaped, b)
 		}
 	}
@@ -58,6 +59,12 @@ func unescape(data []byte) []byte {
 		}
 	}
 	return unescaped
+}
+
+type TimeoutError struct{}
+
+func (e *TimeoutError) Error() string {
+	return "timeout"
 }
 
 type Message struct {
@@ -128,9 +135,13 @@ func (c *SerialClient) send(data []byte) error {
 
 	packet = append(packet, data...)
 
-	_, err := c.port.Write(packet)
+	n, err := c.port.Write(packet)
 	if err != nil {
 		return err
+	}
+
+	if n < 1 {
+		return &TimeoutError{}
 	}
 
 	return nil
@@ -139,7 +150,7 @@ func (c *SerialClient) send(data []byte) error {
 func (c *SerialClient) recv_byte() (byte, error) {
 	// Return error if port is not open
 	if c.port == nil {
-		return 0, errors.New("port is not open")
+		return 0, fmt.Errorf("port is not open")
 	}
 
 	buf := make([]byte, 1)
@@ -150,35 +161,39 @@ func (c *SerialClient) recv_byte() (byte, error) {
 	}
 
 	if n != 1 {
-		return 0, errors.New("failed to read byte")
+		return 0, &TimeoutError{}
 	}
 
 	if buf[0] != ESCAPE {
 		return buf[0], nil
 	}
 
-	// Read the next byte
+	// Read the next byte for the escape sequence
 	n, err = c.port.Read(buf)
 	if err != nil {
 		return 0, err
 	}
 
-	if n != 1 {
-		return 0, errors.New("failed to read byte")
+	if n < 1 {
+		return 0, fmt.Errorf("incomplete escape sequence")
 	}
 
-	if buf[0] == ESCAPE_START {
+	switch buf[0] {
+	case ESCAPE_START:
 		return START, nil
-	} else if buf[0] == ESCAPE_ESCAPE {
+	case ESCAPE_ESCAPE:
 		return ESCAPE, nil
 	}
 
-	return 0, errors.New("invalid escape sequence")
+	return 0, fmt.Errorf("invalid escape sequence")
 }
 
+/*
+Send an unstructured message to the serial port.
+*/
 func (c *SerialClient) SendMessage(message *Message) error {
 	if c.port == nil {
-		return errors.New("port is not open")
+		return fmt.Errorf("port is not open")
 	}
 
 	data := make([]byte, 0)
@@ -203,9 +218,12 @@ func (c *SerialClient) SendMessage(message *Message) error {
 	return nil
 }
 
+/*
+Receive an unstructured message from the serial port.
+*/
 func (c *SerialClient) ReceiveMessage() (*Message, error) {
 	if c.port == nil {
-		return nil, errors.New("port is not open")
+		return nil, fmt.Errorf("port is not open")
 	}
 
 	startDetected := false
@@ -278,7 +296,7 @@ func (c *SerialClient) ReceiveMessage() (*Message, error) {
 	crc := uint16(crcMsb)<<8 | uint16(crcLsb)
 
 	if crc != calculatedCrc {
-		return nil, errors.New("CRC mismatch")
+		return nil, fmt.Errorf("CRC mismatch")
 	}
 
 	return &Message{

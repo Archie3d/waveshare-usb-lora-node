@@ -9,8 +9,10 @@ require (
 	go.bug.st/serial v1.6.4
 )
 
+require github.com/golang/protobuf v1.5.4 // indirect
+
 require (
 	github.com/creack/goselect v0.1.3 // indirect
 	golang.org/x/sys v0.36.0 // indirect
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.9
 )

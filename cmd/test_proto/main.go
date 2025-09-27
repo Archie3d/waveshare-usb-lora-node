@@ -10,6 +10,10 @@ import (
 	client "github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 )
 
+const (
+	PORT = "/dev/ttyACM0"
+)
+
 func main() {
 	packet := &pb.MeshPacket{
 		From: 0x11223344,
@@ -27,7 +31,7 @@ func main() {
 
 	client := client.NewApiClient()
 
-	err = client.Open("COM4")
+	err = client.Open(PORT)
 	if err != nil {
 		log.Fatalf("Failed to open port: %v", err)
 	}
