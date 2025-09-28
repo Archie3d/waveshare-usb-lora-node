@@ -1,193 +1,65 @@
 package client
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
 )
 
-const (
-	// Messages to device
-	MSG_INVALID           = 0x00
-	MSG_GET_VERSION       = 0x01
-	MSG_SET_LORA_PARAMS   = 0x02
-	MSG_SET_LORA_PACKET   = 0x03
-	MSG_SET_RX_PARAMS     = 0x04
-	MSG_SET_TX_PARAMS     = 0x05
-	MSG_SET_FREQUENCY     = 0x06
-	MSG_SET_FALLBACK_MODE = 0x07
-	MSG_GET_RSSI          = 0x08
-	MSG_SET_RX            = 0x09
-	MSG_SET_TX            = 0x0A
-	MSG_SET_STANDBY       = 0x0B
-
-	// Response messages from device to controller
-	MSG_VERSION       = 0x81
-	MSG_LORA_PARAMS   = 0x82
-	MSG_LORA_PACKET   = 0x83
-	MSG_RX_PARAMS     = 0x84
-	MSG_TX_PARAMS     = 0x85
-	MSG_FREQUENCY     = 0x86
-	MSG_FALLBACK_MODE = 0x87
-	MSG_RSSI          = 0x88
-	MSG_RX            = 0x89
-	MSG_TX            = 0x8A
-	MSG_STANDBY       = 0x8B
-
-	// Unsolicited messages (from device)
-	MSG_TIMEOUT            = 0x90
-	MSG_PACKET_RECEIVED    = 0x91
-	MSG_PACKET_TRANSMITTED = 0x92
-	MSG_CONTINUOUS_RSSI    = 0x93
-	MSG_LOGGING            = 0x9F
-)
-
-// LoRa spreading factors
-const (
-	LORA_SF5  = 0x05
-	LORA_SF6  = 0x06
-	LORA_SF7  = 0x07
-	LORA_SF8  = 0x08
-	LORA_SF9  = 0x09
-	LORA_SF10 = 0x0A
-	LORA_SF11 = 0x0B
-	LORA_SF12 = 0x0C
-)
-
-// LoRa bandwidths
-const (
-	LORA_BW_500 = 6
-	LORA_BW_250 = 5
-	LORA_BW_125 = 4
-	LORA_BW_062 = 3
-	LORA_BW_041 = 10
-	LORA_BW_031 = 2
-	LORA_BW_020 = 9
-	LORA_BW_015 = 1
-	LORA_BW_010 = 8
-	LORA_BW_007 = 0
-)
-
-// LoRa coding rates
-const (
-	LORA_CR_4_5 = 0x01
-	LORA_CR_4_6 = 0x02
-	LORA_CR_4_7 = 0x03
-	LORA_CR_4_8 = 0x04
-)
-
-// Power ramp
-const (
-	POWER_RAMP_10   = 0x00
-	POWER_RAMP_20   = 0x01
-	POWER_RAMP_40   = 0x02
-	POWER_RAMP_80   = 0x03
-	POWER_RAMP_200  = 0x04
-	POWER_RAMP_800  = 0x05
-	POWER_RAMP_1700 = 0x06
-	POWER_RAMP_3400 = 0x07
-)
-
-// Fallback modes
-const (
-	FALLBACK_STANDBY_RC      = 0x20
-	FALLBACK_STANDBY_XOSC    = 0x30
-	FALLBACK_STANDBY_XOSC_RX = 0x31
-	FALLBACK_FS              = 0x40
-)
-
-// Standby modes
-const (
-	STANDBY_RC   = 0x00
-	STANDBY_XOSC = 0x01
-)
-
-type Version struct {
-	Major byte
-	Minor byte
-	Patch byte
-}
-
-type LoRaParameters struct {
-	SpreadingFactor byte
-	Bandwidth       byte
-	CodingRate      byte
-	LowDataRate     bool
-}
-
-type LoRaPacketParameters struct {
-	PreambleLength uint16
-	ImplicitHeader bool
-	SyncWord       byte
-	CrcOn          bool
-	InvertIQ       bool
-}
-
-type RxParameters struct {
-	RxBoost bool
-}
-
-type TxParameters struct {
-	DutyCycle byte
-	HpMax     byte
-	Power     byte
-	RampTime  byte
-}
-
 type ApiClient struct {
-	serial       *SerialClient
-	Timeout      bool
-	RxTxComplete bool
-	RSSI         int16
-
-	quit    chan bool
-	version chan Version
+	serial *SerialClient
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func NewApiClient() *ApiClient {
+
 	client := &ApiClient{
-		serial:  NewSerialClient(),
-		quit:    make(chan bool),
-		version: make(chan Version),
+		serial: NewSerialClient(),
+		ctx:    nil,
+		cancel: nil,
 	}
 
 	return client
 }
 
-func (c *ApiClient) Open(portName string) error {
-	if c.serial.IsOpen() {
-		return errors.New("serial port already open")
+func (self *ApiClient) Open(portName string) error {
+	if self.serial.IsOpen() {
+		return fmt.Errorf("serial port already open")
 	}
 
-	err := c.serial.Open(portName)
+	err := self.serial.Open(portName)
 
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		fmt.Println("Starting message handler")
+	self.ctx, self.cancel = context.WithCancel(context.Background())
 
+	// Receive data from device
+	go func() {
 		for {
 			select {
-			case <-c.quit:
+			case <-self.ctx.Done():
 				return
 			default:
-				msg, err := c.serial.ReceiveMessage()
-				if err != nil {
+				msg, err := self.serial.ReceiveMessage()
 
+				if err != nil {
 					_, ok := err.(*TimeoutError)
 					if ok {
 						// Timeout - keep reading
 						continue
+
 					}
 
 					// Failure - terminate reading loop
 					return
 				}
 
-				err = c.handleMessage(msg)
+				err = self.handleMessage(msg)
 				if err != nil {
 					// Error handling message (invalid message?)
 					continue
@@ -199,10 +71,11 @@ func (c *ApiClient) Open(portName string) error {
 	return nil
 }
 
-func (c *ApiClient) Close() error {
-	if c.serial.IsOpen() {
-		c.quit <- true
-		return c.serial.Close()
+func (self *ApiClient) Close() error {
+	self.cancel()
+
+	if self.serial.IsOpen() {
+		return self.serial.Close()
 	}
 
 	return nil
