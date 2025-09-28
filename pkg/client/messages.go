@@ -397,8 +397,8 @@ func (m *SwitchToRx) SerializeRequest() Message {
 		Payload: make([]byte, 5),
 	}
 
-	binary.LittleEndian.PutUint32(message.Payload[0:5], m.Timeout_ms)
-	message.Payload[5] = boolToByte(m.EnableContinuousRSSI)
+	binary.LittleEndian.PutUint32(message.Payload[0:4], m.Timeout_ms)
+	message.Payload[4] = boolToByte(m.EnableContinuousRSSI)
 
 	return message
 }
@@ -412,8 +412,8 @@ func (m *SwitchToRx) DeserializeResponse(msg *Message) error {
 		return fmt.Errorf("invalid message payload size")
 	}
 
-	m.Timeout_ms = binary.LittleEndian.Uint32(msg.Payload[0:5])
-	m.EnableContinuousRSSI = byteToBool(msg.Payload[5])
+	m.Timeout_ms = binary.LittleEndian.Uint32(msg.Payload[0:4])
+	m.EnableContinuousRSSI = byteToBool(msg.Payload[4])
 
 	return nil
 }
@@ -443,7 +443,7 @@ func (m *Transmit) DeserializeResponse(msg *Message) error {
 		return fmt.Errorf("invalid message type")
 	}
 
-	if len(msg.Payload != 1) {
+	if len(msg.Payload) != 1 {
 		return fmt.Errorf("invalid message payload size")
 	}
 

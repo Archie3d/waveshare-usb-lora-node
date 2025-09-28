@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	pb "github.com/meshtastic/go/generated"
 	"google.golang.org/protobuf/proto"
@@ -11,7 +12,8 @@ import (
 )
 
 const (
-	PORT = "/dev/ttyACM0"
+	//PORT = "/dev/ttyACM0"
+	PORT = "COM4"
 )
 
 func main() {
@@ -29,49 +31,21 @@ func main() {
 
 	fmt.Printf("Packet serialized: %v\n", serializedData)
 
-	client := client.NewApiClient()
+	api := client.NewApiClient()
 
-	err = client.Open(PORT)
+	err = api.Open(PORT)
 	if err != nil {
 		log.Fatalf("Failed to open port: %v", err)
 	}
 
-	version, err := client.GetVersion()
-	if err != nil {
-		log.Fatalf("Failed to get version: %v", err)
-	}
-
+	version := api.SendRequest(&client.Version{}, time.Second)
 	fmt.Printf("Version: %v\n", version)
 
-	rssi, err := client.GetRSSI()
+	ena := api.SendRequest(&client.SwitchToRx{}, time.Second)
+	fmt.Printf("Switch to RX %v\n", ena)
 
-	if err != nil {
-		log.Fatalf("Failed to get rssi: %v", err)
-	}
-
+	rssi := api.SendRequest(&client.InstantaneousRSSI{}, time.Second)
 	fmt.Printf("RSSI: %v\n", rssi)
 
-	err = client.SetRx(10000, true)
-	if err != nil {
-		log.Fatalf("Failed to set rx: %v", err)
-	}
-
-	err = client.Wait(15000)
-	if err != nil {
-		log.Fatalf("Failed to wait: %v", err)
-	}
-
-	err = client.Close()
-	if err != nil {
-		log.Fatalf("Failed to close port: %v", err)
-	}
-
-	/*
-			err = ioutil.WriteFile("packet.bin", serializedData, 0644)
-		    if err != nil {
-		        log.Fatalf("Failed to write to file: %v", err)
-		    }
-
-		    fmt.Println("Packet serialized successfully!")
-	*/
+	api.Close()
 }
