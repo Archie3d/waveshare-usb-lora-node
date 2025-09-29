@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
-	pb "github.com/meshtastic/go/generated"
-	"google.golang.org/protobuf/proto"
-
-	client "github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/meshtastic"
 )
 
 const (
@@ -17,35 +15,24 @@ const (
 )
 
 func main() {
-	packet := &pb.MeshPacket{
-		From: 0x11223344,
-		To:   0x22334455,
-	}
+	mesh := meshtastic.NewMeshtasticClient()
 
-	fmt.Printf("Packet: %v\n", packet)
-
-	serializedData, err := proto.Marshal(packet)
+	err := mesh.Open(PORT)
 	if err != nil {
-		log.Fatalf("Failed to marshal packet: %v", err)
+		log.Fatal(err)
 	}
 
-	fmt.Printf("Packet serialized: %v\n", serializedData)
+	defer mesh.Close()
 
-	api := client.NewApiClient()
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	err = api.Open(PORT)
-	if err != nil {
-		log.Fatalf("Failed to open port: %v", err)
-	}
+	go func() {
+		<-c
+		// Make sure we turn the radio off
+		mesh.Close()
+		os.Exit(0)
+	}()
 
-	version := api.SendRequest(&client.Version{}, time.Second)
-	fmt.Printf("Version: %v\n", version)
-
-	ena := api.SendRequest(&client.SwitchToRx{}, time.Second)
-	fmt.Printf("Switch to RX %v\n", ena)
-
-	rssi := api.SendRequest(&client.InstantaneousRSSI{}, time.Second)
-	fmt.Printf("RSSI: %v\n", rssi)
-
-	api.Close()
+	select {}
 }

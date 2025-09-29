@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 const (
@@ -118,6 +117,18 @@ func byteToBool(b byte) bool {
 	return b != 0x00
 }
 
+type MessageTypeError struct{}
+
+func (e *MessageTypeError) Error() string {
+	return "invalid message type"
+}
+
+type MessagePayloadSizeError struct{}
+
+func (e *MessagePayloadSizeError) Error() string {
+	return "invalid message payload size"
+}
+
 //------------------------------------------------------------------------------
 
 type Version struct {
@@ -135,11 +146,11 @@ func (m *Version) SerializeRequest() Message {
 
 func (m *Version) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_VERSION {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 3 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.Major = msg.Payload[0]
@@ -172,11 +183,11 @@ func (m *LoRaParameters) SerializeRequest() Message {
 
 func (m *LoRaParameters) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_LORA_PARAMS {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 4 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.SpreadingFactor = msg.Payload[0]
@@ -218,11 +229,11 @@ func (m *LoRaPacketParameters) SerializeRequest() Message {
 
 func (m *LoRaPacketParameters) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_LORA_PACKET {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 6 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.PreambleLength = binary.LittleEndian.Uint16(msg.Payload[0:2])
@@ -249,11 +260,11 @@ func (m *RxParameters) SerializeRequest() Message {
 
 func (m *RxParameters) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_RX_PARAMS {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 1 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.RxBoost = byteToBool(msg.Payload[0])
@@ -284,11 +295,11 @@ func (m *TxParameters) SerializeRequest() Message {
 
 func (m *TxParameters) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_TX_PARAMS {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 4 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.DutyCycle = msg.Payload[0]
@@ -318,11 +329,11 @@ func (m *RadioFrequency) SerializeRequest() Message {
 
 func (m *RadioFrequency) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_FREQUENCY {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 4 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.Frequency_Hz = binary.LittleEndian.Uint32(msg.Payload)
@@ -345,11 +356,11 @@ func (m *RxTxFallbackMode) SerializeRequest() Message {
 
 func (m *RxTxFallbackMode) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_FALLBACK_MODE {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 1 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.FallbackMode = msg.Payload[0]
@@ -372,11 +383,11 @@ func (m *InstantaneousRSSI) SerializeRequest() Message {
 
 func (m *InstantaneousRSSI) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_RSSI {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 2 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.RSSI_dBm = int16(binary.LittleEndian.Uint16(msg.Payload))
@@ -405,11 +416,11 @@ func (m *SwitchToRx) SerializeRequest() Message {
 
 func (m *SwitchToRx) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_RX {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 5 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.Timeout_ms = binary.LittleEndian.Uint32(msg.Payload[0:4])
@@ -440,11 +451,11 @@ func (m *Transmit) SerializeRequest() Message {
 
 func (m *Transmit) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_TX {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 1 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.Busy = byteToBool(msg.Payload[0])
@@ -467,11 +478,11 @@ func (m *Standby) SerializeRequest() Message {
 
 func (m *Standby) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_STANDBY {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 1 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.StandbyMode = msg.Payload[0]
@@ -496,11 +507,11 @@ func (m *RxTxTimeout) SerializeRequest() Message {
 
 func (m *RxTxTimeout) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_TIMEOUT {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 0 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	return nil
@@ -524,11 +535,11 @@ func (m *PacketReceived) SerializeRequest() Message {
 
 func (m *PacketReceived) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_PACKET_RECEIVED {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) < 3 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.PacketRSSI_dBm = int8(msg.Payload[0])
@@ -561,11 +572,11 @@ func (m *PacketTransmitted) SerializeRequest() Message {
 
 func (m *PacketTransmitted) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_PACKET_TRANSMITTED {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 4 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.TimeOnAir_ms = binary.LittleEndian.Uint32(msg.Payload)
@@ -592,11 +603,11 @@ func (m *ContinuoisRSSI) SerializeRequest() Message {
 
 func (m *ContinuoisRSSI) DeserializeResponse(msg *Message) error {
 	if msg.Type != MSG_CONTINUOUS_RSSI {
-		return fmt.Errorf("invalid message type")
+		return &MessageTypeError{}
 	}
 
 	if len(msg.Payload) != 2 {
-		return fmt.Errorf("invalid message payload size")
+		return &MessagePayloadSizeError{}
 	}
 
 	m.RSSI_dBm = int16(binary.LittleEndian.Uint16(msg.Payload))

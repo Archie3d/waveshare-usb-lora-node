@@ -43,24 +43,6 @@ func escape(data []byte) []byte {
 	return escaped
 }
 
-func unescape(data []byte) []byte {
-	unescaped := make([]byte, 0)
-
-	for i := 0; i < len(data); i++ {
-		if data[i] == ESCAPE {
-			if data[i+1] == ESCAPE_START {
-				unescaped = append(unescaped, START)
-			} else if data[i+1] == ESCAPE_ESCAPE {
-				unescaped = append(unescaped, ESCAPE)
-			}
-			i++
-		} else {
-			unescaped = append(unescaped, data[i])
-		}
-	}
-	return unescaped
-}
-
 type TimeoutError struct{}
 
 func (e *TimeoutError) Error() string {

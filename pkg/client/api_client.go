@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -11,9 +12,10 @@ type ApiClient struct {
 	serial *SerialClient
 	ctx    context.Context
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
-	send chan ApiMessage
-	recv chan ApiMessage
+	Send chan ApiMessage
+	Recv chan ApiMessage
 }
 
 func NewApiClient() *ApiClient {
@@ -22,8 +24,8 @@ func NewApiClient() *ApiClient {
 		serial: NewSerialClient(),
 		ctx:    nil,
 		cancel: nil,
-		send:   make(chan ApiMessage, 1),
-		recv:   make(chan ApiMessage, 1),
+		Send:   make(chan ApiMessage, 1),
+		Recv:   make(chan ApiMessage, 1),
 	}
 
 	return client
@@ -43,12 +45,12 @@ func (c *ApiClient) Open(portName string) error {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
 	// Send data to device
-	go func() {
+	c.wg.Go(func() {
 		for {
 			select {
 			case <-c.ctx.Done():
 				return
-			case msg := <-c.send:
+			case msg := <-c.Send:
 				err = c.sendMessage(msg)
 
 				if err != nil {
@@ -56,10 +58,10 @@ func (c *ApiClient) Open(portName string) error {
 				}
 			}
 		}
-	}()
+	})
 
 	// Receive data from device
-	go func() {
+	c.wg.Go(func() {
 		for {
 			select {
 			case <-c.ctx.Done():
@@ -86,13 +88,21 @@ func (c *ApiClient) Open(portName string) error {
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }
 
 func (c *ApiClient) Close() error {
+	if c.cancel == nil {
+		// The client has never been open
+		return nil
+	}
+
 	c.cancel()
+
+	// Wait for the send and recv goroutines to exit
+	c.wg.Wait()
 
 	if c.serial.IsOpen() {
 		return c.serial.Close()
@@ -155,14 +165,14 @@ func (c *ApiClient) handleMessage(message *Message) error {
 	}
 
 	if msg != nil {
-		c.recv <- msg
+		c.Recv <- msg
 	}
 
 	return nil
 }
 
 func (c *ApiClient) SendMessage(msg ApiMessage) {
-	c.send <- msg
+	c.Send <- msg
 }
 
 func (c *ApiClient) SendRequest(msg ApiMessage, timeout time.Duration) ApiMessage {
@@ -177,7 +187,7 @@ func (c *ApiClient) SendRequest(msg ApiMessage, timeout time.Duration) ApiMessag
 		}
 
 		select {
-		case res := <-c.recv:
+		case res := <-c.Recv:
 			if reflect.TypeOf(res) == reflect.TypeOf(msg) {
 				return res
 			}
@@ -189,7 +199,7 @@ func (c *ApiClient) SendRequest(msg ApiMessage, timeout time.Duration) ApiMessag
 
 func (c *ApiClient) ReceiveMessage(timeout time.Duration) ApiMessage {
 	select {
-	case msg := <-c.recv:
+	case msg := <-c.Recv:
 		return msg
 	case <-time.After(timeout):
 		return nil
