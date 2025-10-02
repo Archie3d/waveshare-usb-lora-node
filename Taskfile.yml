@@ -1,0 +1,32 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  OUTPUT_DIR: "./target"
+
+tasks:
+  build:
+    deps: [make_target_dir]
+    cmds:
+      - go build -o {{.OUTPUT_DIR}} ./...
+
+  release:
+    deps: [make_target_dir]
+    cmds:
+      - go  build -o {{.OUTPUT_DIR}} -ldflagd "-s -w" ./...
+
+  test:
+    cmds:
+      - go test ./...
+
+  clean:
+    cmds:
+      - go clean -testcache
+      - rm -f {{.OUTPUT_DIR}}/ws-node
+    silent: true
+
+  make_target_dir:
+    cmds:
+      - mkdir -p {{.OUTPUT_DIR}}
+    silent: true
