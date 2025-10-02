@@ -33,21 +33,21 @@ type Node struct {
 	wg     sync.WaitGroup
 }
 
-func NewNode() *Node {
+func NewNode(port string, config *NodeConfiguration) *Node {
 	// @todo This should be loaded from a configuration file
 	return &Node{
-		id:         0x12345678,
-		shortName:  "WSH",
-		longName:   "Waveshare",
-		macAddress: []byte{0xAA, 0xBB, 0x12, 0x34, 0x56, 0x78}, // Last 4 bytes are the ID
-		hwModel:    "Waveshare USB LoRa",
-		publicKey:  []byte{0x00},
+		id:         config.Id,
+		shortName:  config.ShortName,
+		longName:   config.LongName,
+		macAddress: config.MacAddress.AsByteArray(),
+		hwModel:    config.HwModel,
+		publicKey:  config.PublicKey,
 
 		channels: []*Channel{
 			NewChannel(0, defaultChannelName, defaultPublicKey),
 		},
 
-		serialPortName:   "COM4",
+		serialPortName:   port,
 		meshtasticClient: NewMeshtasticClient(),
 	}
 }

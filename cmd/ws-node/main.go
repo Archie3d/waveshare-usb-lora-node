@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -14,9 +16,43 @@ const (
 	PORT = "COM4"
 )
 
-func main() {
+func usage() {
+	flag.PrintDefaults()
+}
 
-	node := meshtastic.NewNode()
+func showUsageAndExit(exitCode int) {
+	fmt.Println("Waveshare USB LoRa Meshtastic Node")
+	usage()
+	os.Exit(exitCode)
+}
+
+func main() {
+	var configFile = flag.String("c", "", "Configuration file")
+	var serialPort = flag.String("p", "", "Serial port")
+	var showHelp = flag.Bool("h", false, "Show help")
+
+	log.SetFlags(0)
+	flag.Usage = usage
+	flag.Parse()
+
+	if *showHelp {
+		showUsageAndExit(0)
+	}
+
+	if *serialPort == "" {
+		log.Fatal("Serial port number is not specified")
+	}
+
+	if *configFile == "" {
+		log.Fatal("Configuration file is not specified")
+	}
+
+	config, err := meshtastic.LoadNodeConfiguration(*configFile)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %s", err.Error())
+	}
+
+	node := meshtastic.NewNode(*serialPort, config)
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
 	}
