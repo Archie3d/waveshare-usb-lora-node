@@ -11,11 +11,6 @@ import (
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/meshtastic"
 )
 
-const (
-	//PORT = "/dev/ttyACM0"
-	PORT = "COM4"
-)
-
 func usage() {
 	flag.PrintDefaults()
 }

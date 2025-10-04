@@ -34,8 +34,7 @@ type Node struct {
 }
 
 func NewNode(port string, config *NodeConfiguration) *Node {
-	// @todo This should be loaded from a configuration file
-	return &Node{
+	node := &Node{
 		id:         config.Id,
 		shortName:  config.ShortName,
 		longName:   config.LongName,
@@ -50,6 +49,21 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		serialPortName:   port,
 		meshtasticClient: NewMeshtasticClient(),
 	}
+
+	for _, ch := range config.Channels {
+		key := ch.EncryptionKey
+		if len(key) == 1 && key[0] == 0x01 {
+			key = defaultPublicKey
+		}
+
+		node.channels = append(node.channels, NewChannel(
+			ch.Id,
+			ch.Name,
+			key,
+		))
+	}
+
+	return node
 }
 
 func (n *Node) Start() error {
