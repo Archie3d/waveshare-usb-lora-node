@@ -49,6 +49,7 @@ func (c *Channel) DecodePacket(packet *client.PacketReceived) (*pb.MeshPacket, e
 	toNode := binary.LittleEndian.Uint32(packet.Data[0:4])
 	fromNode := binary.LittleEndian.Uint32(packet.Data[4:8])
 	packetId := binary.LittleEndian.Uint32(packet.Data[8:12])
+	flags := packet.Data[12]
 
 	nonce := make([]byte, 16)
 	binary.LittleEndian.PutUint64(nonce[0:8], uint64(packetId))
@@ -80,6 +81,10 @@ func (c *Channel) DecodePacket(packet *client.PacketReceived) (*pb.MeshPacket, e
 		Channel:      c.id,
 		RxRssi:       int32(packet.PacketRSSI_dBm),
 		RxSnr:        float32(packet.PacketSNR_dB),
+		HopLimit:     uint32(flags & 0x07),
+		WantAck:      flags&0x08 != 0,
+		ViaMqtt:      flags&0x10 != 0,
+		HopStart:     uint32(flags >> 5),
 	}
 
 	meshPacket.PayloadVariant = &pb.MeshPacket_Decoded{Decoded: data}
@@ -90,9 +95,9 @@ func (c *Channel) DecodePacket(packet *client.PacketReceived) (*pb.MeshPacket, e
 func (c *Channel) EncodePacket(meshPacket *pb.MeshPacket) ([]byte, error) {
 	packet := []byte{}
 
-	binary.LittleEndian.AppendUint32(packet, meshPacket.To)
-	binary.LittleEndian.AppendUint32(packet, meshPacket.From)
-	binary.LittleEndian.AppendUint32(packet, meshPacket.Id)
+	packet = binary.LittleEndian.AppendUint32(packet, meshPacket.To)
+	packet = binary.LittleEndian.AppendUint32(packet, meshPacket.From)
+	packet = binary.LittleEndian.AppendUint32(packet, meshPacket.Id)
 
 	var flags byte = byte(meshPacket.HopLimit & 0x07)
 
@@ -105,12 +110,13 @@ func (c *Channel) EncodePacket(meshPacket *pb.MeshPacket) ([]byte, error) {
 	}
 
 	flags |= byte(meshPacket.HopStart&0x07) << 5
+	flags |= byte(meshPacket.HopLimit & 0x07)
 
 	packet = append(packet, flags)
 	packet = append(packet, c.hash)
 
 	// @todo should we put the hop value in here?
-	binary.LittleEndian.AppendUint16(packet, 0)
+	packet = binary.LittleEndian.AppendUint16(packet, 0)
 
 	block, err := aes.NewCipher(c.encryptionKey)
 	if err != nil {

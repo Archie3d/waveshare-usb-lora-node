@@ -2,7 +2,10 @@ package meshtastic
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"log"
+	"math/rand/v2"
 	"sync"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
@@ -79,7 +82,7 @@ func (n *Node) Start() error {
 			select {
 			case <-n.ctx.Done():
 				break loop
-			case packet := <-n.meshtasticClient.Packets:
+			case packet := <-n.meshtasticClient.IncomingPackets:
 				packetHandled := false
 				for _, channel := range n.channels {
 					meshPacket, err := channel.DecodePacket(packet)
@@ -110,6 +113,49 @@ func (n *Node) Stop() error {
 	n.wg.Wait()
 
 	return n.meshtasticClient.Close()
+}
+
+func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
+	var channel *Channel = nil
+
+	for _, ch := range n.channels {
+		if ch.id == channelId {
+			channel = ch
+			break
+		}
+	}
+
+	if channel == nil {
+		return fmt.Errorf("node does not have channel id %d", channelId)
+	}
+
+	meshPacket := pb.MeshPacket{
+		From:     n.id,
+		To:       toNode,
+		Channel:  channelId,
+		Id:       rand.Uint32(), // @todo Have a better way to inject packet IDs
+		WantAck:  false,
+		ViaMqtt:  false,
+		HopStart: 7,
+		HopLimit: 7,
+		PayloadVariant: &pb.MeshPacket_Decoded{
+			Decoded: &pb.Data{
+				Portnum: pb.PortNum_TEXT_MESSAGE_APP,
+				Payload: []byte(text),
+			},
+		},
+	}
+
+	data, err := channel.EncodePacket(&meshPacket)
+	if err != nil {
+		return err
+	}
+
+	log.Println(hex.EncodeToString(data))
+
+	n.meshtasticClient.OutgoingPackets <- data
+
+	return nil
 }
 
 func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {

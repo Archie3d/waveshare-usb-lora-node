@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
@@ -19,9 +20,10 @@ func TestDecode(t *testing.T) {
 		0xFF, 0xFF, 0xFF, 0xFF, // Dest
 		0xC0, 0x74, 0x3C, 0x43, // From (nodeNumber, little endian)
 		0xBC, 0xA0, 0x4A, 0x11, // Id
-		0xE7,       // Flags
-		0x08,       // Hash - xor of the key (16 bytes) and the channel name, default channel name is ""
-		0x00, 0x00, // Align
+		0xE7, // Flags
+		0x08, // Hash - xor of the key (16 bytes) and the channel name, default channel name is ""
+		0x00,
+		0x00, // Align
 
 		// Meshtastic payload
 		33, 147, 1, 47, 199, 0, 80, 234, 167, 167, 95,
@@ -87,4 +89,40 @@ func TestDecode(t *testing.T) {
 	if meshPacket.Portnum == pb.PortNum_TEXT_MESSAGE_APP {
 		t.Logf("Text message: %s\n", string(meshPacket.Payload))
 	}
+}
+
+func TestReceivedPacketDecode(t *testing.T) {
+	packet := client.PacketReceived{
+		PacketRSSI_dBm: 0,
+		PacketSNR_dB:   0,
+		SignalRSSI_dBm: 0,
+		Data: []byte{
+			0xff, 0xff, 0xff, 0xff,
+			0x44, 0x33, 0x22, 0x11,
+			0x5f, 0xb1, 0x3e, 0xfb,
+			0xe7,       // Flags
+			0x08,       // Hash
+			0x00, 0x00, // Align
+			0x7d, 0x7f, 0xa9, 0x49, 0x1a, 0xd1, 0x39, 0xf4,
+			0xf9, 0xf3, 0x57, 0x5b, 0x83, 0x05, 0x4d, 0xa6,
+			0xdb, 0x2c, 0x25, 0xa8, 0x82, 0x25, 0x5f, 0xa4,
+			0x7e, 0x91, 0x9f, 0xff, 0x39,
+		},
+	}
+
+	channel := NewChannel(0, "LongFast", defaultPublicKey)
+	meshPacket, err := channel.DecodePacket(&packet)
+	assert.NoError(t, err)
+
+	assert.Equal(t, uint32(0xFFFFFFFF), meshPacket.To)
+	assert.Equal(t, uint32(0x11223344), meshPacket.From)
+	assert.Equal(t, uint32(0xFb3EB15F), meshPacket.Id)
+	assert.Equal(t, uint32(7), meshPacket.HopLimit)
+	assert.Equal(t, uint32(7), meshPacket.HopStart)
+
+	decoded, ok := meshPacket.PayloadVariant.(*pb.MeshPacket_Decoded)
+	assert.True(t, ok)
+
+	assert.Equal(t, pb.PortNum_TEXT_MESSAGE_APP, decoded.Decoded.Portnum)
+	assert.Equal(t, "Hello from Waveshare USB!", string(decoded.Decoded.Payload))
 }

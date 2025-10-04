@@ -3,6 +3,7 @@ package meshtastic
 import (
 	"context"
 	"encoding/binary"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,18 +34,21 @@ type MeshtasticClient struct {
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 
-	rssi_dBm atomic.Int32
+	rssi_dBm     atomic.Int32
+	timeOnAir_ms atomic.Uint32
 
 	seenPackets []PacketTimespamp
 
-	Packets chan *client.PacketReceived
+	IncomingPackets chan *client.PacketReceived
+	OutgoingPackets chan []byte
 }
 
 // Create a new Meshtastic client but do not run it yet.
 func NewMeshtasticClient() *MeshtasticClient {
 	return &MeshtasticClient{
-		apiClient: client.NewApiClient(),
-		Packets:   make(chan *client.PacketReceived, 10),
+		apiClient:       client.NewApiClient(),
+		IncomingPackets: make(chan *client.PacketReceived, 10),
+		OutgoingPackets: make(chan []byte, 10),
 	}
 }
 
@@ -68,6 +72,8 @@ func (c *MeshtasticClient) Open(portName string) error {
 				break loop
 			case radioMessage := <-c.apiClient.Recv:
 				c.handleRadioMessage(radioMessage)
+			case outgoingPacket := <-c.OutgoingPackets:
+				c.transmitPacket(outgoingPacket)
 			}
 		}
 
@@ -123,9 +129,18 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 		if !c.haveSeenPacket(&record) {
 			c.seenPackets = append(c.seenPackets, record)
 
-			c.Packets <- packet
+			c.IncomingPackets <- packet
 		}
-
+	} else if transmitted, ok := msg.(*client.PacketTransmitted); ok {
+		// Capture total time on air
+		c.timeOnAir_ms.Add(transmitted.TimeOnAir_ms)
+		c.switchToRx()
+		log.Printf("* Packet transmitted * Time on air %d ms\n", transmitted.TimeOnAir_ms)
+	} else if _, ok := msg.(*client.RxTxTimeout); ok {
+		// Timeout receiving or transmitting the message.
+		// But since we don't use timeouts for RX, this signifies transmit timeout
+		c.switchToRx()
+		log.Println("* RxTx timeout *")
 	} else if rssi, ok := msg.(*client.ContinuoisRSSI); ok {
 		// Capture RSSI
 		c.rssi_dBm.Store(int32(rssi.RSSI_dBm))
@@ -154,4 +169,17 @@ func (c *MeshtasticClient) haveSeenPacket(p *PacketTimespamp) bool {
 	}
 
 	return false
+}
+
+func (c *MeshtasticClient) transmitPacket(packet []byte) {
+	res := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 0, Data: packet, Busy: false}, time.Second)
+
+	tr, ok := res.(*client.Transmit)
+	if !ok {
+		log.Println("Invalid response to Transmit request")
+	} else {
+		if tr.Busy {
+			log.Println("TX is busy")
+		}
+	}
 }
