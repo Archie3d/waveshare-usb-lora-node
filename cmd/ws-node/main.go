@@ -35,7 +35,7 @@ func main() {
 	}
 
 	if *serialPort == "" {
-		log.Fatal("Serial port number is not specified")
+		log.Fatal("Serial port is not specified")
 	}
 
 	if *configFile == "" {

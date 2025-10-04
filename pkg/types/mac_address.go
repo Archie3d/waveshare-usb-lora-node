@@ -38,5 +38,11 @@ func (m *MacAddress) UnmarshalYAML(node *yaml.Node) error {
 		mac = append(mac, b...)
 	}
 
+	if len(mac) != 6 {
+		return fmt.Errorf("mac address length is invalid")
+	}
+
+	*m = MacAddress(mac)
+
 	return nil
 }

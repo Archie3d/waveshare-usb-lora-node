@@ -1,0 +1,13 @@
+id: 0x11223344
+short_name: "TestNode"
+long_name: "TestNodeLongName"
+mac_address: "AA:BB:11:22:33:44"
+hw_model: "HardwareModel"
+public_key: "dHoq1lfsCgG5CP+XAI24vyWZX6xXXKa9K+Yp3s4XCok="
+channels:
+  - id: 0
+    name: "LongFast"
+    encryption_key: "AQ=="
+  - id: 1
+    name: "Private"
+    encryption_key: "NRHtkaJFJyV1ftZ6GluFNR1rBr3MeqHvBmyIKaho4VY="
