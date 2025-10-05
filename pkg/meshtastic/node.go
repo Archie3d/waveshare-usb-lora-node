@@ -151,8 +151,6 @@ func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
 		return err
 	}
 
-	log.Println(hex.EncodeToString(data))
-
 	n.meshtasticClient.OutgoingPackets <- data
 
 	return nil
@@ -189,5 +187,6 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 }
 
 func (n *Node) handleUnknownPacket(packet *client.PacketReceived) {
-	log.Printf("@todo handleUnknownPacket %v\n", packet)
+	log.Printf("handleUnknownPacket %v\n", packet)
+	log.Println(hex.EncodeToString(packet.Data))
 }

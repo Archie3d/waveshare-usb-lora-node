@@ -443,8 +443,8 @@ func (m *Transmit) SerializeRequest() Message {
 		Payload: make([]byte, len(m.Data)+4),
 	}
 
-	binary.LittleEndian.PutUint32(message.Payload[0:5], m.Timeout_ms)
-	copy(message.Payload[5:], m.Data)
+	binary.LittleEndian.PutUint32(message.Payload[0:4], m.Timeout_ms)
+	copy(message.Payload[4:], m.Data)
 
 	return message
 }

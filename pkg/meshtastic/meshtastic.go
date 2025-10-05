@@ -97,7 +97,23 @@ func (c *MeshtasticClient) Close() error {
 
 func (c *MeshtasticClient) initRadio() {
 	// Switch back to RX once the message has been transmitted
-	_ = c.apiClient.SendRequest(&client.RxTxFallbackMode{FallbackMode: client.FALLBACK_STANDBY_XOSC_RX}, time.Second)
+	_ = c.apiClient.SendRequest(&client.RxTxFallbackMode{
+		FallbackMode: client.FALLBACK_STANDBY_XOSC_RX,
+	}, time.Second)
+
+	_ = c.apiClient.SendRequest(&client.TxParameters{
+		DutyCycle: 0x02, // 0x04 max
+		HpMax:     0x02, //
+		Power:     0x0E, // +14dBm
+		RampTime:  0x03, // 3.4 ms
+	}, time.Second)
+
+	_ = c.apiClient.SendRequest(&client.LoRaParameters{
+		SpreadingFactor: client.LORA_SF11,
+		Bandwidth:       client.LORA_BW_250,
+		CodingRate:      client.LORA_CR_4_5,
+		LowDataRate:     false,
+	}, time.Second)
 
 	// Start receiving
 	c.switchToRx()
@@ -172,14 +188,30 @@ func (c *MeshtasticClient) haveSeenPacket(p *PacketTimespamp) bool {
 }
 
 func (c *MeshtasticClient) transmitPacket(packet []byte) {
-	res := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 0, Data: packet, Busy: false}, time.Second)
+	// Purge records of older packets
+	c.forgetOldSeenPackets()
+
+	res := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 3000, Data: packet, Busy: false}, 3*time.Second)
 
 	tr, ok := res.(*client.Transmit)
 	if !ok {
 		log.Println("Invalid response to Transmit request")
+		log.Printf("%v", tr)
 	} else {
 		if tr.Busy {
 			log.Println("TX is busy")
 		}
+	}
+
+	// Add our own transmitted packet to avoid receiving the retransmissions
+	record := PacketTimespamp{
+		dest:     binary.BigEndian.Uint32(packet[0:4]),
+		from:     binary.BigEndian.Uint32(packet[4:8]),
+		id:       binary.LittleEndian.Uint32(packet[8:12]),
+		received: time.Now(),
+	}
+
+	if !c.haveSeenPacket(&record) {
+		c.seenPackets = append(c.seenPackets, record)
 	}
 }

@@ -70,7 +70,7 @@ func main() {
 
 	log.Println("Sending message")
 
-	err = node.SendText(0, 0xFFFFFFFF, "Hello from Waveshare USB!")
+	err = node.SendText(0, 0xFFFFFFFF, "Hello from Waveshare USB LoRa!")
 	if err != nil {
 		log.Printf("SendText failed: %v\n", err)
 	}
