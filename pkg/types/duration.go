@@ -1,36 +1,22 @@
 package types
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Duration time.Duration
 
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(d).String())
+func (k Duration) MarshalYAML() (any, error) {
+	return time.Duration(k).String(), nil
 }
 
-func (d *Duration) UnmarshalJSON(b []byte) error {
-	var v any
-
-	if err := json.Unmarshal(b, &v); err != nil {
+func (k *Duration) UnmarshalYAML(node *yaml.Node) error {
+	tmp, err := time.ParseDuration(node.Value)
+	if err != nil {
 		return err
 	}
-
-	switch value := v.(type) {
-	case float64:
-		*d = Duration(time.Duration(value))
-		return nil
-	case string:
-		tmp, err := time.ParseDuration(value)
-		if err != nil {
-			return err
-		}
-		*d = Duration(tmp)
-		return nil
-	default:
-		return fmt.Errorf("invalid durastion")
-	}
+	*k = Duration(tmp)
+	return nil
 }

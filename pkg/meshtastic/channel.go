@@ -12,24 +12,20 @@ import (
 )
 
 type Channel struct {
-	id            uint32
-	name          string
-	encryptionKey []byte
-	hash          byte
+	id            uint32 // Channel ID
+	name          string // Channel name, like "LongFast"
+	encryptionKey []byte // Channel encryption key (AES)
+	hash          byte   // Channels hash for quick identification
 }
 
 func NewChannel(id uint32, name string, key []byte) *Channel {
 
 	var digest []byte = append([]byte(name), key...)
 
-	var hash byte
+	var hash byte = 0
 
-	for i, c := range digest {
-		if i == 0 {
-			hash = c
-		} else {
-			hash = hash ^ c
-		}
+	for _, c := range digest {
+		hash = hash ^ c
 	}
 
 	return &Channel{

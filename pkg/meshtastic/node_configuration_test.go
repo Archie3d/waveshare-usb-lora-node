@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,4 +28,10 @@ func TestLoadNodeConfigYaml(t *testing.T) {
 
 	assert.Equal(t, uint32(1), cfg.Channels[1].Id)
 	assert.Equal(t, "Private", cfg.Channels[1].Name)
+
+	assert.Equal(t, uint32(869525000), cfg.Radio.Frequency)
+	assert.Equal(t, 17, int(cfg.Radio.Power))
+	assert.Equal(t, 11, int(cfg.Radio.SpreadingFactor))
+	assert.Equal(t, client.LORA_BW_250, int(cfg.Radio.Bandwidth))
+	assert.Equal(t, client.LORA_CR_4_5, int(cfg.Radio.CodingRate))
 }

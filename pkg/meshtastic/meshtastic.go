@@ -3,6 +3,7 @@ package meshtastic
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -54,7 +55,7 @@ func NewMeshtasticClient() *MeshtasticClient {
 
 // Open serial port to talk to the LoRa device and
 // start receiving Meshtastic messages.
-func (c *MeshtasticClient) Open(portName string) error {
+func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration) error {
 	err := c.apiClient.Open(portName)
 	if err != nil {
 		return err
@@ -62,7 +63,10 @@ func (c *MeshtasticClient) Open(portName string) error {
 
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
-	c.initRadio()
+	err = c.initRadio(radioConfig)
+	if err != nil {
+		return err
+	}
 
 	c.wg.Go(func() {
 	loop:
@@ -77,7 +81,7 @@ func (c *MeshtasticClient) Open(portName string) error {
 			}
 		}
 
-		c.deinitRadio()
+		_ = c.deinitRadio()
 	})
 
 	return nil
@@ -95,36 +99,97 @@ func (c *MeshtasticClient) Close() error {
 	return c.apiClient.Close()
 }
 
-func (c *MeshtasticClient) initRadio() {
+func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
 	// Switch back to RX once the message has been transmitted
-	_ = c.apiClient.SendRequest(&client.RxTxFallbackMode{
+	if res := c.apiClient.SendRequest(&client.RxTxFallbackMode{
 		FallbackMode: client.FALLBACK_STANDBY_XOSC_RX,
+	}, time.Second); res == nil {
+		return fmt.Errorf("failed to set radio standby mode")
+	}
+
+	// Frequency
+	res := c.apiClient.SendRequest(&client.RadioFrequency{
+		Frequency_Hz: radioConfig.Frequency,
 	}, time.Second)
 
-	_ = c.apiClient.SendRequest(&client.TxParameters{
-		DutyCycle: 0x02, // 0x04 max
-		HpMax:     0x02, //
-		Power:     0x0E, // +14dBm
-		RampTime:  0x03, // 3.4 ms
-	}, time.Second)
+	f, ok := res.(*client.RadioFrequency)
+	if !ok {
+		return fmt.Errorf("failed to set radio frequency")
+	}
+	if f.Frequency_Hz != radioConfig.Frequency {
+		return fmt.Errorf("failed to set radio frequency to %d Hz", radioConfig.Frequency)
+	}
 
-	_ = c.apiClient.SendRequest(&client.LoRaParameters{
-		SpreadingFactor: client.LORA_SF11,
-		Bandwidth:       client.LORA_BW_250,
-		CodingRate:      client.LORA_CR_4_5,
+	var txParams *client.TxParameters = nil
+
+	switch radioConfig.Power {
+	case 14:
+		txParams = &client.TxParameters{
+			DutyCycle: 0x02,
+			HpMax:     0x02,
+			Power:     0x0E,
+			RampTime:  0x03,
+		}
+	case 17:
+		txParams = &client.TxParameters{
+			DutyCycle: 0x02,
+			HpMax:     0x03,
+			Power:     0x11,
+			RampTime:  0x03,
+		}
+	case 20:
+		txParams = &client.TxParameters{
+			DutyCycle: 0x03,
+			HpMax:     0x05,
+			Power:     0x14,
+			RampTime:  0x03,
+		}
+	case 22:
+		txParams = &client.TxParameters{
+			DutyCycle: 0x04,
+			HpMax:     0x07,
+			Power:     0x16,
+			RampTime:  0x03,
+		}
+	default:
+		return fmt.Errorf("unsupported TX power value: %d", radioConfig.Power)
+	}
+
+	if res := c.apiClient.SendRequest(txParams, time.Second); res == nil {
+		return fmt.Errorf("failed to configure TX parameters")
+	}
+
+	res = c.apiClient.SendRequest(&client.LoRaParameters{
+		SpreadingFactor: byte(radioConfig.SpreadingFactor),
+		Bandwidth:       byte(radioConfig.Bandwidth),
+		CodingRate:      byte(radioConfig.CodingRate),
 		LowDataRate:     false,
 	}, time.Second)
+	if res == nil {
+		return fmt.Errorf("failed to set LoRa parameters")
+	}
 
 	// Start receiving
 	c.switchToRx()
+
+	return nil
 }
 
-func (c *MeshtasticClient) deinitRadio() {
-	_ = c.apiClient.SendRequest(&client.Standby{StandbyMode: client.STANDBY_XOSC}, time.Second)
+func (c *MeshtasticClient) deinitRadio() error {
+	res := c.apiClient.SendRequest(&client.Standby{StandbyMode: client.STANDBY_XOSC}, time.Second)
+	if res == nil {
+		return fmt.Errorf("failed to switch to standby mode")
+	}
+	return nil
 }
 
-func (c *MeshtasticClient) switchToRx() {
-	_ = c.apiClient.SendRequest(&client.SwitchToRx{}, time.Second)
+func (c *MeshtasticClient) switchToRx() error {
+	res := c.apiClient.SendRequest(&client.SwitchToRx{}, time.Second)
+	if res == nil {
+		return fmt.Errorf("failed to switch to RX mode")
+	}
+
+	return nil
 }
 
 func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {

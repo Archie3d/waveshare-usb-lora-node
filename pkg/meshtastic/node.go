@@ -26,7 +26,8 @@ type Node struct {
 	hwModel    string
 	publicKey  []byte
 
-	channels []*Channel
+	channels    []*Channel
+	radioConfig RadioConfiguration
 
 	serialPortName   string
 	meshtasticClient *MeshtasticClient
@@ -49,6 +50,8 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 			NewChannel(0, defaultChannelName, defaultPublicKey),
 		},
 
+		radioConfig: config.Radio,
+
 		serialPortName:   port,
 		meshtasticClient: NewMeshtasticClient(),
 	}
@@ -70,7 +73,7 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 }
 
 func (n *Node) Start() error {
-	if err := n.meshtasticClient.Open(n.serialPortName); err != nil {
+	if err := n.meshtasticClient.Open(n.serialPortName, &n.radioConfig); err != nil {
 		return err
 	}
 
@@ -164,12 +167,12 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 
 	switch decoded.Decoded.Portnum {
 	case pb.PortNum_TEXT_MESSAGE_APP:
-		log.Printf("TEXT MESSAGE: %s\n", decoded.Decoded.Payload)
+		log.Printf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
 	case pb.PortNum_NODEINFO_APP:
 		user := &pb.User{}
 		err := proto.Unmarshal(decoded.Decoded.Payload, user)
 		if err == nil {
-			log.Printf("NODE INFO: %v\n", user)
+			log.Printf("NODE INFO from %x: %v\n", meshPacket.From, user)
 		} else {
 			log.Println("NODE INFO: unable to decode")
 		}
@@ -177,7 +180,7 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 		telemetry := &pb.Telemetry{}
 		err := proto.Unmarshal(decoded.Decoded.Payload, telemetry)
 		if err == nil {
-			log.Printf("TELEMETRY: %v\n", telemetry)
+			log.Printf("TELEMETRY %x: %v\n", meshPacket.From, telemetry)
 		} else {
 			log.Println("TELEMETRY: unable to decode")
 		}
