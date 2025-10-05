@@ -4,6 +4,14 @@ long_name: "TestNodeLongName"
 mac_address: "AA:BB:11:22:33:44"
 hw_model: "HardwareModel"
 public_key: "dHoq1lfsCgG5CP+XAI24vyWZX6xXXKa9K+Yp3s4XCok="
+
+radio:
+  frequency: 869525000
+  power: 17
+  spreading_factor: 11
+  bandwidth: 250
+  coding_rate: "4/5"
+
 channels:
   - id: 0
     name: "LongFast"

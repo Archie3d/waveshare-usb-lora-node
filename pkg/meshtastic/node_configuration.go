@@ -17,7 +17,17 @@ type NodeConfiguration struct {
 	HwModel    string           `yaml:"hw_model"`
 	PublicKey  types.CryptoKey  `yaml:"public_key"`
 
+	Radio RadioConfiguration `yaml:"radio"`
+
 	Channels []ChannelConfiguration `yaml:"channels"`
+}
+
+type RadioConfiguration struct {
+	Frequency       uint32              `yaml:"frequency"`
+	Power           LoRaPower           `yaml:"power"`
+	SpreadingFactor LoRaSpreadingFactor `yaml:"spreading_factor"`
+	Bandwidth       LoRaBandwidth       `yaml:"bandwidth"`
+	CodingRate      LoRaCodingRate      `yaml:"coding_rate"`
 }
 
 type ChannelConfiguration struct {
