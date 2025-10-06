@@ -192,6 +192,8 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 		return
 	}
 
+	log.Printf("RSSI: %ddBm, SNR: %fdB\n", meshPacket.RxRssi, meshPacket.RxSnr)
+
 	switch decoded.Decoded.Portnum {
 	case pb.PortNum_TEXT_MESSAGE_APP:
 		log.Printf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
