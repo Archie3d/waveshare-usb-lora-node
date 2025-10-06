@@ -7,8 +7,10 @@ import (
 	"log"
 	"math/rand/v2"
 	"sync"
+	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
 	pb "github.com/meshtastic/go/generated"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,6 +34,8 @@ type Node struct {
 	serialPortName   string
 	meshtasticClient *MeshtasticClient
 
+	eventLoop event_loop.EventLoop
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -54,6 +58,8 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 
 		serialPortName:   port,
 		meshtasticClient: NewMeshtasticClient(),
+
+		eventLoop: event_loop.NewEventLoop(),
 	}
 
 	for _, ch := range config.Channels {
@@ -87,8 +93,11 @@ func (n *Node) Start() error {
 				break loop
 			case packet := <-n.meshtasticClient.IncomingPackets:
 				packetHandled := false
+				isForThisNode := false
+
 				for _, channel := range n.channels {
 					meshPacket, err := channel.DecodePacket(packet)
+					isForThisNode = meshPacket.To == n.id
 
 					if err == nil && meshPacket != nil {
 						n.handlePacket(meshPacket)
@@ -100,9 +109,16 @@ func (n *Node) Start() error {
 				if !packetHandled {
 					n.handleUnknownPacket(packet)
 				}
+
+				if !isForThisNode {
+					// This is not out packet - retransmit it
+					n.retransmitPacket(packet)
+				}
 			}
 		}
 	})
+
+	n.wg.Go(n.eventLoop.Run)
 
 	return nil
 }
@@ -112,6 +128,7 @@ func (n *Node) Stop() error {
 		return nil
 	}
 
+	n.eventLoop.Quit()
 	n.cancel()
 	n.wg.Wait()
 
@@ -156,9 +173,19 @@ func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
 
 	n.meshtasticClient.OutgoingPackets <- data
 
+	// Retransmit
+	n.eventLoop.Post(func(el event_loop.EventLoop) {
+		n.meshtasticClient.OutgoingPackets <- data
+	}, time.Now().Add(time.Second*3))
+
+	n.eventLoop.Post(func(el event_loop.EventLoop) {
+		n.meshtasticClient.OutgoingPackets <- data
+	}, time.Now().Add(time.Second*7))
+
 	return nil
 }
 
+// Handle incoming packets received on the radio
 func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 	decoded, ok := meshPacket.PayloadVariant.(*pb.MeshPacket_Decoded)
 	if !ok {
@@ -192,4 +219,26 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 func (n *Node) handleUnknownPacket(packet *client.PacketReceived) {
 	log.Printf("handleUnknownPacket %v\n", packet)
 	log.Println(hex.EncodeToString(packet.Data))
+}
+
+func (n *Node) retransmitPacket(packet *client.PacketReceived) {
+	flags := packet.Data[12]
+	hopLimit := flags & 0x07
+
+	if hopLimit == 0 {
+		return
+	}
+
+	hopLimit -= 1
+
+	flags = (flags & 0xF8) | hopLimit
+
+	data := make([]byte, len(packet.Data))
+	data[12] = flags
+
+	log.Println("Retransmitting incoming packet")
+
+	n.eventLoop.Post(func(el event_loop.EventLoop) {
+		n.meshtasticClient.OutgoingPackets <- data
+	}, time.Now().Add(time.Second))
 }
