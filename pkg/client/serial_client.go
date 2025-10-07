@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 	"go.bug.st/serial"
 )
 
@@ -41,12 +42,6 @@ func escape(data []byte) []byte {
 		}
 	}
 	return escaped
-}
-
-type TimeoutError struct{}
-
-func (e *TimeoutError) Error() string {
-	return "timeout"
 }
 
 type Message struct {
@@ -123,7 +118,7 @@ func (c *SerialClient) send(data []byte) error {
 	}
 
 	if n < 1 {
-		return &TimeoutError{}
+		return &types.TimeoutError{}
 	}
 
 	return nil
@@ -143,7 +138,7 @@ func (c *SerialClient) recv_byte() (byte, error) {
 	}
 
 	if n != 1 {
-		return 0, &TimeoutError{}
+		return 0, &types.TimeoutError{}
 	}
 
 	if buf[0] != ESCAPE {

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 )
 
 type ApiClient struct {
@@ -70,7 +72,7 @@ func (c *ApiClient) Open(portName string) error {
 				msg, err := c.serial.ReceiveMessage()
 
 				if err != nil {
-					_, ok := err.(*TimeoutError)
+					_, ok := err.(*types.TimeoutError)
 					if ok {
 						// Timeout - keep reading
 						continue
@@ -175,33 +177,36 @@ func (c *ApiClient) SendMessage(msg ApiMessage) {
 	c.Send <- msg
 }
 
-func (c *ApiClient) SendRequest(msg ApiMessage, timeout time.Duration) ApiMessage {
-	c.sendMessage(msg)
+func (c *ApiClient) SendRequest(msg ApiMessage, timeout time.Duration) (ApiMessage, error) {
+	err := c.sendMessage(msg)
+	if err != nil {
+		return nil, err
+	}
 
 	start := time.Now()
 
 	for {
 		elapsed := time.Since(start)
 		if elapsed >= timeout {
-			return nil
+			return nil, &types.TimeoutError{}
 		}
 
 		select {
 		case res := <-c.Recv:
 			if reflect.TypeOf(res) == reflect.TypeOf(msg) {
-				return res
+				return res, nil
 			}
 		case <-time.After(timeout - elapsed):
-			return nil
+			return nil, &types.TimeoutError{}
 		}
 	}
 }
 
-func (c *ApiClient) ReceiveMessage(timeout time.Duration) ApiMessage {
+func (c *ApiClient) ReceiveMessage(timeout time.Duration) (ApiMessage, error) {
 	select {
 	case msg := <-c.Recv:
-		return msg
+		return msg, nil
 	case <-time.After(timeout):
-		return nil
+		return nil, &types.TimeoutError{}
 	}
 }

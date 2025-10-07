@@ -118,6 +118,20 @@ func (n *Node) Start() error {
 		}
 	})
 
+	// Log errors from Meshtastic client
+	n.wg.Go(func() {
+	loop:
+		for {
+			select {
+			case <-n.ctx.Done():
+				break loop
+			case err := <-n.meshtasticClient.Errors:
+				log.Println(err.Error())
+			}
+		}
+	})
+
+	// Run the event loop
 	n.wg.Go(n.eventLoop.Run)
 
 	return nil

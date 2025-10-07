@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 )
 
 type Header struct {
@@ -42,6 +43,8 @@ type MeshtasticClient struct {
 
 	IncomingPackets chan *client.PacketReceived
 	OutgoingPackets chan []byte
+
+	Errors chan error
 }
 
 // Create a new Meshtastic client but do not run it yet.
@@ -50,6 +53,7 @@ func NewMeshtasticClient() *MeshtasticClient {
 		apiClient:       client.NewApiClient(),
 		IncomingPackets: make(chan *client.PacketReceived, 10),
 		OutgoingPackets: make(chan []byte, 10),
+		Errors:          make(chan error, 10),
 	}
 }
 
@@ -77,7 +81,10 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 			case radioMessage := <-c.apiClient.Recv:
 				c.handleRadioMessage(radioMessage)
 			case outgoingPacket := <-c.OutgoingPackets:
-				c.transmitPacket(outgoingPacket)
+				err := c.transmitPacket(outgoingPacket)
+				if err != nil {
+					c.Errors <- fmt.Errorf("packet transmission failed: %v", err)
+				}
 			}
 		}
 
@@ -101,21 +108,25 @@ func (c *MeshtasticClient) Close() error {
 
 func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
 	// Switch back to RX once the message has been transmitted
-	if res := c.apiClient.SendRequest(&client.RxTxFallbackMode{
+	if _, err := c.apiClient.SendRequest(&client.RxTxFallbackMode{
 		FallbackMode: client.FALLBACK_STANDBY_XOSC_RX,
-	}, time.Second); res == nil {
-		return fmt.Errorf("failed to set radio standby mode")
+	}, time.Second); err != nil {
+		return fmt.Errorf("failed to set radio standby mode: %v", err.Error())
 	}
 
 	// Frequency
-	res := c.apiClient.SendRequest(&client.RadioFrequency{
+	res, err := c.apiClient.SendRequest(&client.RadioFrequency{
 		Frequency_Hz: radioConfig.Frequency,
 	}, time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to set radio frequency: %v", err.Error())
+	}
 
 	f, ok := res.(*client.RadioFrequency)
 	if !ok {
-		return fmt.Errorf("failed to set radio frequency")
+		return fmt.Errorf("failed to set radio frequency: invalid response from device")
 	}
+
 	if f.Frequency_Hz != radioConfig.Frequency {
 		return fmt.Errorf("failed to set radio frequency to %d Hz", radioConfig.Frequency)
 	}
@@ -155,18 +166,19 @@ func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
 		return fmt.Errorf("unsupported TX power value: %d", radioConfig.Power)
 	}
 
-	if res := c.apiClient.SendRequest(txParams, time.Second); res == nil {
-		return fmt.Errorf("failed to configure TX parameters")
+	if _, err := c.apiClient.SendRequest(txParams, time.Second); err != nil {
+		return fmt.Errorf("failed to configure TX parameters: %v", err)
 	}
 
-	res = c.apiClient.SendRequest(&client.LoRaParameters{
+	_, err = c.apiClient.SendRequest(&client.LoRaParameters{
 		SpreadingFactor: byte(radioConfig.SpreadingFactor),
 		Bandwidth:       byte(radioConfig.Bandwidth),
 		CodingRate:      byte(radioConfig.CodingRate),
 		LowDataRate:     false,
 	}, time.Second)
-	if res == nil {
-		return fmt.Errorf("failed to set LoRa parameters")
+
+	if err != nil {
+		return fmt.Errorf("failed to set LoRa parameters: %v", err)
 	}
 
 	// Start receiving
@@ -176,27 +188,26 @@ func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
 }
 
 func (c *MeshtasticClient) deinitRadio() error {
-	res := c.apiClient.SendRequest(&client.Standby{StandbyMode: client.STANDBY_XOSC}, time.Second)
-	if res == nil {
-		return fmt.Errorf("failed to switch to standby mode")
+	_, err := c.apiClient.SendRequest(&client.Standby{StandbyMode: client.STANDBY_XOSC}, time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to switch to standby mode: %v", err)
 	}
 	return nil
 }
 
 func (c *MeshtasticClient) switchToRx() error {
-	res := c.apiClient.SendRequest(&client.SwitchToRx{}, time.Second)
-	if res == nil {
-		return fmt.Errorf("failed to switch to RX mode")
+	_, err := c.apiClient.SendRequest(&client.SwitchToRx{}, time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to switch to RX mode: %v", err)
 	}
 
 	return nil
 }
 
 func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
-	if packet, ok := msg.(*client.PacketReceived); ok {
-		// Switch back to RX mode
-		c.switchToRx()
+	var shouldSwitchToRx bool = false
 
+	if packet, ok := msg.(*client.PacketReceived); ok {
 		// Purge records of older packets
 		c.forgetOldSeenPackets()
 
@@ -213,19 +224,29 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 			c.IncomingPackets <- packet
 		}
 	} else if transmitted, ok := msg.(*client.PacketTransmitted); ok {
+		shouldSwitchToRx = true
+
 		// Capture total time on air
 		c.timeOnAir_ms.Add(transmitted.TimeOnAir_ms)
-		c.switchToRx()
 		log.Printf("* Packet transmitted * Time on air %d ms\n", transmitted.TimeOnAir_ms)
 	} else if _, ok := msg.(*client.RxTxTimeout); ok {
+		shouldSwitchToRx = true
 		// Timeout receiving or transmitting the message.
 		// But since we don't use timeouts for RX, this signifies transmit timeout
-		c.switchToRx()
 		log.Println("* RxTx timeout *")
 	} else if rssi, ok := msg.(*client.ContinuoisRSSI); ok {
 		// Capture RSSI
 		c.rssi_dBm.Store(int32(rssi.RSSI_dBm))
 	}
+
+	if shouldSwitchToRx {
+		// Switch back to RX mode
+		err := c.switchToRx()
+		if err != nil {
+			c.Errors <- err
+		}
+	}
+
 }
 
 func (c *MeshtasticClient) forgetOldSeenPackets() {
@@ -252,19 +273,21 @@ func (c *MeshtasticClient) haveSeenPacket(p *PacketTimespamp) bool {
 	return false
 }
 
-func (c *MeshtasticClient) transmitPacket(packet []byte) {
+func (c *MeshtasticClient) transmitPacket(packet []byte) error {
 	// Purge records of older packets
 	c.forgetOldSeenPackets()
 
-	res := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 3000, Data: packet, Busy: false}, 3*time.Second)
+	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 3000, Data: packet, Busy: false}, 3*time.Second)
+	if err != nil {
+		return err
+	}
 
 	tr, ok := res.(*client.Transmit)
 	if !ok {
-		log.Println("Invalid response to Transmit request")
-		log.Printf("%v", tr)
+		return fmt.Errorf("invalid response to Transmit request")
 	} else {
 		if tr.Busy {
-			log.Println("TX is busy")
+			return &types.BusyError{}
 		}
 	}
 
@@ -279,4 +302,6 @@ func (c *MeshtasticClient) transmitPacket(packet []byte) {
 	if !c.haveSeenPacket(&record) {
 		c.seenPackets = append(c.seenPackets, record)
 	}
+
+	return nil
 }
