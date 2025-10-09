@@ -12,6 +12,7 @@ import (
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
 	pb "github.com/meshtastic/go/generated"
+	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -27,6 +28,9 @@ type Node struct {
 	macAddress []byte
 	hwModel    string
 	publicKey  []byte
+
+	natsUrl  string
+	natsConn *nats.Conn
 
 	channels    []*Channel
 	radioConfig RadioConfiguration
@@ -49,6 +53,9 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		macAddress: config.MacAddress.AsByteArray(),
 		hwModel:    config.HwModel,
 		publicKey:  config.PublicKey,
+
+		natsUrl:  config.NatsUrl,
+		natsConn: nil,
 
 		channels: []*Channel{
 			NewChannel(0, defaultChannelName, defaultPublicKey),
@@ -82,6 +89,14 @@ func (n *Node) Start() error {
 	if err := n.meshtasticClient.Open(n.serialPortName, &n.radioConfig); err != nil {
 		return err
 	}
+
+	// Run the nats client
+	nc, err := nats.Connect(n.natsUrl)
+	if err != nil {
+		return err
+	}
+
+	n.natsConn = nc
 
 	n.ctx, n.cancel = context.WithCancel(context.Background())
 
@@ -211,6 +226,9 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 	switch decoded.Decoded.Portnum {
 	case pb.PortNum_TEXT_MESSAGE_APP:
 		log.Printf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
+		if n.natsConn != nil {
+			n.natsConn.Publish("meshtastic.text", decoded.Decoded.Payload)
+		}
 	case pb.PortNum_NODEINFO_APP:
 		user := &pb.User{}
 		err := proto.Unmarshal(decoded.Decoded.Payload, user)

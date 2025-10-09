@@ -17,6 +17,8 @@ type NodeConfiguration struct {
 	HwModel    string           `yaml:"hw_model"`
 	PublicKey  types.CryptoKey  `yaml:"public_key"`
 
+	NatsUrl string `yaml:"nats"`
+
 	Radio RadioConfiguration `yaml:"radio"`
 
 	Channels []ChannelConfiguration `yaml:"channels"`
