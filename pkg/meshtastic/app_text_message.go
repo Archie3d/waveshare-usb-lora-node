@@ -3,15 +3,15 @@ package meshtastic
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
 )
 
 type TextApplicationIncomingMessage struct {
-	From uint32 `json:"from"`
-	Text string `json:"text"`
+	ChannelId uint32 `json:"channel"`
+	From      uint32 `json:"from"`
+	Text      string `json:"text"`
 }
 
 type TextApplicationOutgoingMessage struct {
@@ -64,9 +64,18 @@ func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) erro
 		return fmt.Errorf("invalid message format")
 	}
 
-	log.Printf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
 	if app.natsConn != nil {
-		app.natsConn.Publish("mesh.app.text_message.incoming", decoded.Decoded.Payload)
+		textMessage := TextApplicationIncomingMessage{
+			ChannelId: meshPacket.Channel,
+			From:      meshPacket.From,
+			Text:      string(decoded.Decoded.Payload),
+		}
+
+		j, err := json.Marshal(textMessage)
+
+		if err == nil {
+			app.natsConn.Publish("mesh.app.text_message.incoming", j)
+		}
 	}
 
 	return nil

@@ -182,9 +182,7 @@ func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
 	}
 
 	// Start receiving
-	c.switchToRx()
-
-	return nil
+	return c.switchToRx()
 }
 
 func (c *MeshtasticClient) deinitRadio() error {
@@ -208,6 +206,8 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 	var shouldSwitchToRx bool = false
 
 	if packet, ok := msg.(*client.PacketReceived); ok {
+		shouldSwitchToRx = true
+
 		// Purge records of older packets
 		c.forgetOldSeenPackets()
 
@@ -223,6 +223,7 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 
 			c.IncomingPackets <- packet
 		}
+
 	} else if transmitted, ok := msg.(*client.PacketTransmitted); ok {
 		shouldSwitchToRx = true
 
