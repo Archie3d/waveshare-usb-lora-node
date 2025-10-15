@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/meshtastic"
 )
@@ -49,6 +48,9 @@ func main() {
 	}
 
 	node := meshtastic.NewNode(*serialPort, config)
+
+	node.AddApplication(meshtastic.NewTextApplication())
+
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
 	}
@@ -65,15 +67,17 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Println("Waiting for the device to initialize")
-	<-time.After(time.Second)
+	//log.Println("Waiting for the device to initialize")
+	//<-time.After(time.Second)
 
-	log.Println("Sending message")
+	/*
+		log.Println("Sending message")
 
-	err = node.SendText(0, 0xFFFFFFFF, "Hello from Waveshare USB LoRa!")
-	if err != nil {
-		log.Printf("SendText failed: %v\n", err)
-	}
+		err = node.SendText(0, 0xFFFFFFFF, "Hello from Waveshare USB LoRa!")
+		if err != nil {
+			log.Printf("SendText failed: %v\n", err)
+		}
+	*/
 
 	select {}
 }

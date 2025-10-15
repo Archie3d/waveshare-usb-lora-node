@@ -38,6 +38,8 @@ type Node struct {
 	serialPortName   string
 	meshtasticClient *MeshtasticClient
 
+	applications []Application
+
 	eventLoop event_loop.EventLoop
 
 	ctx    context.Context
@@ -83,6 +85,10 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 	}
 
 	return node
+}
+
+func (n *Node) AddApplication(app Application) {
+	n.applications = append(n.applications, app)
 }
 
 func (n *Node) Start() error {
@@ -149,12 +155,22 @@ func (n *Node) Start() error {
 	// Run the event loop
 	n.wg.Go(n.eventLoop.Run)
 
+	// Start the apps
+	for _, app := range n.applications {
+		app.Start(n.natsConn, n)
+	}
+
 	return nil
 }
 
 func (n *Node) Stop() error {
 	if n.cancel == nil {
 		return nil
+	}
+
+	// Stop the applications
+	for _, app := range n.applications {
+		app.Stop()
 	}
 
 	n.eventLoop.Quit()
@@ -164,15 +180,17 @@ func (n *Node) Stop() error {
 	return n.meshtasticClient.Close()
 }
 
-func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
-	var channel *Channel = nil
-
+func (n *Node) GetChannel(channelId uint32) *Channel {
 	for _, ch := range n.channels {
 		if ch.id == channelId {
-			channel = ch
-			break
+			return ch
 		}
 	}
+	return nil
+}
+
+func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
+	channel := n.GetChannel(channelId)
 
 	if channel == nil {
 		return fmt.Errorf("node does not have channel id %d", channelId)
@@ -210,6 +228,52 @@ func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
 	n.eventLoop.Post(func(el event_loop.EventLoop) {
 		n.meshtasticClient.OutgoingPackets <- data
 	}, time.Now().Add(time.Second*7))
+
+	return nil
+}
+
+// ApplicationMessageSink interface
+func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, portNum pb.PortNum, payload []byte) error {
+	channel := n.GetChannel(channelId)
+
+	if channel == nil {
+		return fmt.Errorf("node does not have channel id %d", channelId)
+	}
+
+	meshPacket := pb.MeshPacket{
+		From:     n.id,
+		To:       destination,
+		Channel:  channelId,
+		Id:       rand.Uint32(), // @todo Have a better way to inject packet IDs
+		WantAck:  false,
+		ViaMqtt:  false,
+		HopStart: 7,
+		HopLimit: 7,
+		PayloadVariant: &pb.MeshPacket_Decoded{
+			Decoded: &pb.Data{
+				Portnum: portNum,
+				Payload: payload,
+			},
+		},
+	}
+
+	data, err := channel.EncodePacket(&meshPacket)
+	if err != nil {
+		return err
+	}
+
+	n.meshtasticClient.OutgoingPackets <- data
+
+	// Retransmit
+	/*
+		n.eventLoop.Post(func(el event_loop.EventLoop) {
+			n.meshtasticClient.OutgoingPackets <- data
+		}, time.Now().Add(time.Second*3))
+
+		n.eventLoop.Post(func(el event_loop.EventLoop) {
+			n.meshtasticClient.OutgoingPackets <- data
+		}, time.Now().Add(time.Second*7))
+	*/
 
 	return nil
 }
