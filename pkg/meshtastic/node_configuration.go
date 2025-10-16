@@ -14,10 +14,11 @@ type NodeConfiguration struct {
 	ShortName  string           `yaml:"short_name"`
 	LongName   string           `yaml:"long_name"`
 	MacAddress types.MacAddress `yaml:"mac_address"`
-	HwModel    string           `yaml:"hw_model"`
+	HwModel    uint32           `yaml:"hw_model"`
 	PublicKey  types.CryptoKey  `yaml:"public_key"`
 
-	NatsUrl string `yaml:"nats"`
+	NatsUrl           string `yaml:"nats_url"`
+	NatsSubjectPrefix string `yaml:"nats_subject_prefix"`
 
 	Radio RadioConfiguration `yaml:"radio"`
 

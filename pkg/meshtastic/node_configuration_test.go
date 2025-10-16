@@ -18,7 +18,7 @@ func TestLoadNodeConfigYaml(t *testing.T) {
 	assert.Equal(t, "TestNode", cfg.ShortName)
 	assert.Equal(t, "TestNodeLongName", cfg.LongName)
 	assert.Equal(t, types.MacAddress([]byte{0xAA, 0xBB, 0x11, 0x22, 0x33, 0x44}), cfg.MacAddress)
-	assert.Equal(t, "HardwareModel", cfg.HwModel)
+	assert.Equal(t, 255, cfg.HwModel)
 
 	assert.Equal(t, 2, len(cfg.Channels))
 

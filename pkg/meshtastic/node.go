@@ -26,7 +26,7 @@ type Node struct {
 	shortName  string
 	longName   string
 	macAddress []byte
-	hwModel    string
+	hwModel    uint32
 	publicKey  []byte
 
 	natsUrl  string
@@ -118,9 +118,9 @@ func (n *Node) Start() error {
 
 				for _, channel := range n.channels {
 					meshPacket, err := channel.DecodePacket(packet)
-					isForThisNode = meshPacket.To == n.id
 
 					if err == nil && meshPacket != nil {
+						isForThisNode = meshPacket.To == n.id
 						n.handlePacket(meshPacket)
 						packetHandled = true
 						break
@@ -289,7 +289,10 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 
 	for _, app := range n.applications {
 		if app.GetPortNum() == decoded.Decoded.Portnum {
-			_ = app.HandleIncomingPacket(meshPacket)
+			err := app.HandleIncomingPacket(meshPacket)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 

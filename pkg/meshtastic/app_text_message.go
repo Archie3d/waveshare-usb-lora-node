@@ -21,14 +21,20 @@ type TextApplicationOutgoingMessage struct {
 }
 
 type TextApplication struct {
-	natsConn    *nats.Conn
-	messageSink ApplicationMessageSink
+	config          *NodeConfiguration
+	natsConn        *nats.Conn
+	messageSink     ApplicationMessageSink
+	outgoingSubject string
+	incomingSubject string
 }
 
-func NewTextApplication() *TextApplication {
+func NewTextApplication(config *NodeConfiguration) *TextApplication {
 	return &TextApplication{
-		natsConn:    nil,
-		messageSink: nil,
+		config:          config,
+		natsConn:        nil,
+		messageSink:     nil,
+		outgoingSubject: config.NatsSubjectPrefix + ".app.text_message.outgoing",
+		incomingSubject: config.NatsSubjectPrefix + ".app.text_message.incoming",
 	}
 }
 
@@ -40,7 +46,7 @@ func (app *TextApplication) Start(natsConnection *nats.Conn, sink ApplicationMes
 	app.natsConn = natsConnection
 	app.messageSink = sink
 
-	app.natsConn.Subscribe("mesh.app.text_message.outgoing", func(msg *nats.Msg) {
+	app.natsConn.Subscribe(app.outgoingSubject, func(msg *nats.Msg) {
 		var textMessage TextApplicationOutgoingMessage
 
 		if err := json.Unmarshal(msg.Data, &textMessage); err == nil {
@@ -71,10 +77,15 @@ func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) erro
 			Text:      string(decoded.Decoded.Payload),
 		}
 
-		j, err := json.Marshal(textMessage)
+		jsonMessage, err := json.Marshal(textMessage)
 
-		if err == nil {
-			app.natsConn.Publish("mesh.app.text_message.incoming", j)
+		if err != nil {
+			return err
+		}
+
+		err = app.natsConn.Publish(app.incomingSubject, jsonMessage)
+		if err != nil {
+			return err
 		}
 	}
 

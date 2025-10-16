@@ -49,7 +49,8 @@ func main() {
 
 	node := meshtastic.NewNode(*serialPort, config)
 
-	node.AddApplication(meshtastic.NewTextApplication())
+	node.AddApplication(meshtastic.NewTextApplication(config))
+	node.AddApplication(meshtastic.NewNodeInfoApplication(config))
 
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
