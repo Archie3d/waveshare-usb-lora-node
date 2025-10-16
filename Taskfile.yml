@@ -7,12 +7,12 @@ vars:
 
 tasks:
   build:
-    deps: [make_target_dir]
+    deps: [make_target_dir, generate]
     cmds:
       - go build -o {{.OUTPUT_DIR}} ./...
 
   release:
-    deps: [make_target_dir]
+    deps: [make_target_dir, generate]
     cmds:
       - go  build -o {{.OUTPUT_DIR}} -ldflagd "-s -w" ./...
 
@@ -25,6 +25,10 @@ tasks:
       - go clean -testcache
       - rm -f {{.OUTPUT_DIR}}/ws-node
     silent: true
+
+  generate:
+    cmds:
+      - go generate ./...
 
   make_target_dir:
     cmds:

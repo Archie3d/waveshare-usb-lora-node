@@ -12,8 +12,9 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 Make sure `$HOME/go/bin` is in the `$PATH`.
 
 ## Compiling
+Using [Taskfile](https://taskfile.dev/)
 ```
-go generate ./...
+task build
 ```
 
 ## Using serial port
