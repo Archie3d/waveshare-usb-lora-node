@@ -14,11 +14,11 @@ func TestLoadNodeConfigYaml(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	assert.Equal(t, uint32(0x11223344), cfg.Id)
-	assert.Equal(t, "TestNode", cfg.ShortName)
-	assert.Equal(t, "TestNodeLongName", cfg.LongName)
-	assert.Equal(t, types.MacAddress([]byte{0xAA, 0xBB, 0x11, 0x22, 0x33, 0x44}), cfg.MacAddress)
-	assert.Equal(t, 255, cfg.HwModel)
+	assert.Equal(t, uint32(0x1c6406e9), cfg.Id)
+	assert.Equal(t, "WSNode", cfg.ShortName)
+	assert.Equal(t, "WaveshareNode", cfg.LongName)
+	assert.Equal(t, types.MacAddress([]byte{0xDA, 0xB4, 0x1C, 0x64, 0x06, 0xE9}), cfg.MacAddress)
+	assert.Equal(t, uint32(255), cfg.HwModel)
 
 	assert.Equal(t, 2, len(cfg.Channels))
 

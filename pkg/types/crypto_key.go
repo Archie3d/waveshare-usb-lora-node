@@ -9,7 +9,7 @@ import (
 type CryptoKey []byte
 
 func (k CryptoKey) MarshalYAML() (any, error) {
-	return base64.StdEncoding.EncodeToString(k), nil
+	return k.String(), nil
 }
 
 func (k *CryptoKey) UnmarshalYAML(node *yaml.Node) error {
@@ -21,4 +21,8 @@ func (k *CryptoKey) UnmarshalYAML(node *yaml.Node) error {
 	}
 	*k = ba
 	return nil
+}
+
+func (k CryptoKey) String() string {
+	return base64.StdEncoding.EncodeToString(k)
 }

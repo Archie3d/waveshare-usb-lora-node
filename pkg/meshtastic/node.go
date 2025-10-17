@@ -257,6 +257,16 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, port
 		},
 	}
 
+	log.Printf("%v\n", meshPacket)
+
+	if portNum == pb.PortNum_NODEINFO_APP {
+		user := &pb.User{}
+		err := proto.Unmarshal(payload, user)
+		if err == nil {
+			log.Printf("MY NODE INFO from %x: %v\n", meshPacket.From, user)
+		}
+	}
+
 	data, err := channel.EncodePacket(&meshPacket)
 	if err != nil {
 		return err
