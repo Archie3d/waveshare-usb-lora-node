@@ -1,10 +1,11 @@
 module github.com/Archie3d/waveshare-usb-lora-client
 
-go 1.25.1
+go 1.25.2
 
 replace github.com/meshtastic/go/generated => ./gen/github.com/meshtastic/go/generated
 
 require (
+	github.com/charmbracelet/log v0.4.2
 	github.com/meshtastic/go/generated v0.0.0-00010101000000-000000000000
 	github.com/nats-io/nats.go v1.46.1
 	github.com/stretchr/testify v1.11.1
@@ -16,7 +17,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
-	github.com/charmbracelet/log v0.4.2 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
