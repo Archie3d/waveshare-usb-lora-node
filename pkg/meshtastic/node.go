@@ -124,6 +124,8 @@ func (n *Node) Start() error {
 						n.handlePacket(meshPacket)
 						packetHandled = true
 						break
+					} else {
+						log.Printf("Channel %d decode failed: %s", channel.id, err.Error())
 					}
 				}
 
@@ -133,7 +135,10 @@ func (n *Node) Start() error {
 
 				if !isForThisNode {
 					// This is not out packet - retransmit it
-					n.retransmitPacket(packet)
+					capturedPacket := *packet
+					n.eventLoop.Post(func(el event_loop.EventLoop) {
+						n.retransmitPacket(&capturedPacket)
+					}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
 				}
 			}
 		}
@@ -255,16 +260,6 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, port
 				Payload: payload,
 			},
 		},
-	}
-
-	log.Printf("%v\n", meshPacket)
-
-	if portNum == pb.PortNum_NODEINFO_APP {
-		user := &pb.User{}
-		err := proto.Unmarshal(payload, user)
-		if err == nil {
-			log.Printf("MY NODE INFO from %x: %v\n", meshPacket.From, user)
-		}
 	}
 
 	data, err := channel.EncodePacket(&meshPacket)
