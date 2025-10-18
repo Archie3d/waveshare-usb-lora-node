@@ -8,15 +8,19 @@ import (
 
 type Duration time.Duration
 
-func (k Duration) MarshalYAML() (any, error) {
-	return time.Duration(k).String(), nil
+func (d Duration) MarshalYAML() (any, error) {
+	return d.String(), nil
 }
 
-func (k *Duration) UnmarshalYAML(node *yaml.Node) error {
+func (d *Duration) UnmarshalYAML(node *yaml.Node) error {
 	tmp, err := time.ParseDuration(node.Value)
 	if err != nil {
 		return err
 	}
-	*k = Duration(tmp)
+	*d = Duration(tmp)
 	return nil
+}
+
+func (d Duration) String() string {
+	return time.Duration(d).String()
 }

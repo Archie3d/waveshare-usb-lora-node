@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
+	"github.com/charmbracelet/log"
 )
 
 type Header struct {
@@ -229,12 +229,12 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 
 		// Capture total time on air
 		c.timeOnAir_ms.Add(transmitted.TimeOnAir_ms)
-		log.Printf("* Packet transmitted * Time on air %d ms\n", transmitted.TimeOnAir_ms)
+		log.With("timeOnAir", time.Duration(transmitted.TimeOnAir_ms)*time.Millisecond).Debug("Packet transmitted")
 	} else if _, ok := msg.(*client.RxTxTimeout); ok {
 		shouldSwitchToRx = true
 		// Timeout receiving or transmitting the message.
 		// But since we don't use timeouts for RX, this signifies transmit timeout
-		log.Println("* RxTx timeout *")
+		log.Warn("RX/TX timeout")
 	} else if rssi, ok := msg.(*client.ContinuoisRSSI); ok {
 		// Capture RSSI
 		c.rssi_dBm.Store(int32(rssi.RSSI_dBm))

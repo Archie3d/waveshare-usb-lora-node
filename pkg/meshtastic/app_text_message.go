@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/charmbracelet/log"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
 )
@@ -44,25 +45,38 @@ func (app *TextApplication) GetPortNum() pb.PortNum {
 	return pb.PortNum_TEXT_MESSAGE_APP
 }
 
-func (app *TextApplication) Start(natsConnection *nats.Conn, sink ApplicationMessageSink) {
+func (app *TextApplication) Start(natsConnection *nats.Conn, sink ApplicationMessageSink) error {
 	app.natsConn = natsConnection
 	app.messageSink = sink
 
 	app.natsConn.Subscribe(app.outgoingSubject, func(msg *nats.Msg) {
 		var textMessage TextApplicationOutgoingMessage
 
-		if err := json.Unmarshal(msg.Data, &textMessage); err == nil {
-			app.messageSink.SendApplicationMessage(
-				textMessage.ChannelId,
-				textMessage.To,
-				app.GetPortNum(),
-				[]byte(textMessage.Text),
-			)
+		err := json.Unmarshal(msg.Data, &textMessage)
+		if err != nil {
+			log.With("err", err).Errorf("failed to unmarshal text message")
+			return
+		}
+
+		err = app.messageSink.SendApplicationMessage(
+			textMessage.ChannelId,
+			textMessage.To,
+			app.GetPortNum(),
+			[]byte(textMessage.Text),
+		)
+
+		if err != nil {
+			log.With("err", err).Errorf("failed to send text message")
 		}
 	})
+
+	log.Info("Started Text application")
+
+	return nil
 }
 
-func (app *TextApplication) Stop() {
+func (app *TextApplication) Stop() error {
+	return nil
 }
 
 func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) error {

@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/meshtastic"
+	"github.com/charmbracelet/log"
 )
 
 func usage() {
@@ -24,14 +24,25 @@ func showUsageAndExit(exitCode int) {
 func main() {
 	var configFile = flag.String("c", "", "Configuration file")
 	var serialPort = flag.String("p", "", "Serial port")
+	var logLevel = flag.String("l", "info", "Log level")
 	var showHelp = flag.Bool("h", false, "Show help")
 
-	log.SetFlags(0)
 	flag.Usage = usage
 	flag.Parse()
 
 	if *showHelp {
 		showUsageAndExit(0)
+	}
+
+	switch *logLevel {
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	default:
+		log.Fatalf("Invalid log level '%s'", *logLevel)
 	}
 
 	if *serialPort == "" {
@@ -44,13 +55,16 @@ func main() {
 
 	config, err := meshtastic.LoadNodeConfiguration(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %s", err.Error())
+		log.With("err", err).Fatal("Failed to load configuration")
 	}
 
 	node := meshtastic.NewNode(*serialPort, config)
 
 	node.AddApplication(meshtastic.NewTextApplication(config))
-	node.AddApplication(meshtastic.NewNodeInfoApplication(config))
+
+	if config.NodeInfo != nil {
+		node.AddApplication(meshtastic.NewNodeInfoApplication(config))
+	}
 
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
@@ -68,17 +82,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	//log.Println("Waiting for the device to initialize")
-	//<-time.After(time.Second)
-
-	/*
-		log.Println("Sending message")
-
-		err = node.SendText(0, 0xFFFFFFFF, "Hello from Waveshare USB LoRa!")
-		if err != nil {
-			log.Printf("SendText failed: %v\n", err)
-		}
-	*/
+	log.Info("Node is up an running")
 
 	select {}
 }

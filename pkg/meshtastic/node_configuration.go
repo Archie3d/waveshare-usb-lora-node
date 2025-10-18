@@ -23,6 +23,10 @@ type NodeConfiguration struct {
 	Radio RadioConfiguration `yaml:"radio"`
 
 	Channels []ChannelConfiguration `yaml:"channels"`
+
+	Retransmit *RetransmitConfiguration `yaml:"retransmit"`
+
+	NodeInfo *NodeInfoConfiguration `yaml:"node_info,omitempty"`
 }
 
 type RadioConfiguration struct {
@@ -33,10 +37,21 @@ type RadioConfiguration struct {
 	CodingRate      LoRaCodingRate      `yaml:"coding_rate"`
 }
 
+type RetransmitConfiguration struct {
+	Forward bool             `yaml:"forward"`
+	Period  []types.Duration `yaml:"period"`
+	Jitter  types.Duration   `yaml:"jitter"`
+}
+
 type ChannelConfiguration struct {
 	Id            uint32          `yaml:"id"`
 	Name          string          `yaml:"name"`
 	EncryptionKey types.CryptoKey `yaml:"encryption_key"`
+}
+
+type NodeInfoConfiguration struct {
+	Channel       uint32         `yaml:"channel"`
+	PublishPeriod types.Duration `yaml:"publish_period"`
 }
 
 func LoadNodeConfiguration(configFile string) (*NodeConfiguration, error) {

@@ -15,8 +15,8 @@ func TestLoadNodeConfigYaml(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, uint32(0x1c6406e9), cfg.Id)
-	assert.Equal(t, "WSNode", cfg.ShortName)
-	assert.Equal(t, "WaveshareNode", cfg.LongName)
+	assert.Equal(t, "WSN1", cfg.ShortName)
+	assert.Equal(t, "WaveshareNode1", cfg.LongName)
 	assert.Equal(t, types.MacAddress([]byte{0xDA, 0xB4, 0x1C, 0x64, 0x06, 0xE9}), cfg.MacAddress)
 	assert.Equal(t, uint32(255), cfg.HwModel)
 

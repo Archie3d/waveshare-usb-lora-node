@@ -3,12 +3,12 @@ package meshtastic
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
+	"github.com/charmbracelet/log"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
@@ -33,18 +33,21 @@ type NodeInfoApplication struct {
 	messageSink     ApplicationMessageSink
 	outgoingSubject string
 	incomingSubject string
+	publishPeriod   time.Duration
 
 	wg        sync.WaitGroup
 	eventLoop event_loop.EventLoop
 }
 
 func NewNodeInfoApplication(config *NodeConfiguration) *NodeInfoApplication {
+
 	return &NodeInfoApplication{
 		config:          config,
 		natsConn:        nil,
 		messageSink:     nil,
 		outgoingSubject: config.NatsSubjectPrefix + ".app.node_info.outgoing",
 		incomingSubject: config.NatsSubjectPrefix + ".app.node_info.incoming",
+		publishPeriod:   time.Duration(config.NodeInfo.PublishPeriod),
 		eventLoop:       event_loop.NewEventLoop(),
 	}
 }
@@ -53,7 +56,7 @@ func (app *NodeInfoApplication) GetPortNum() pb.PortNum {
 	return pb.PortNum_NODEINFO_APP
 }
 
-func (app *NodeInfoApplication) Start(natsConnection *nats.Conn, sink ApplicationMessageSink) {
+func (app *NodeInfoApplication) Start(natsConnection *nats.Conn, sink ApplicationMessageSink) error {
 	app.natsConn = natsConnection
 	app.messageSink = sink
 
@@ -64,11 +67,20 @@ func (app *NodeInfoApplication) Start(natsConnection *nats.Conn, sink Applicatio
 	app.eventLoop.Post(func(el event_loop.EventLoop) {
 		app.publishNodeInfo()
 	}, time.Now().Add(10*time.Second))
+
+	log.With(
+		"channel", app.config.NodeInfo.Channel,
+		"period", app.config.NodeInfo.PublishPeriod.String(),
+	).Info("Started Node Info application")
+
+	return nil
 }
 
-func (app *NodeInfoApplication) Stop() {
+func (app *NodeInfoApplication) Stop() error {
 	app.eventLoop.Quit()
 	app.wg.Wait()
+
+	return nil
 }
 
 func (app *NodeInfoApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) error {
@@ -126,7 +138,7 @@ func (app *NodeInfoApplication) publishNodeInfo() {
 
 	bytes, err := proto.Marshal(&user)
 	if err != nil {
-		log.Printf("Failed to marshal %s\n", err.Error())
+		log.With("err", err).Warn("Failed to marshal node info data")
 		return
 	}
 
@@ -139,5 +151,5 @@ func (app *NodeInfoApplication) publishNodeInfo() {
 
 	app.eventLoop.Post(func(el event_loop.EventLoop) {
 		app.publishNodeInfo()
-	}, time.Now().Add(1*time.Minute))
+	}, time.Now().Add(app.publishPeriod))
 }

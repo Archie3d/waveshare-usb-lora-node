@@ -11,7 +11,7 @@ type ApplicationMessageSink interface {
 
 type Application interface {
 	GetPortNum() pb.PortNum
-	Start(natsConnection *nats.Conn, sink ApplicationMessageSink)
-	Stop()
+	Start(natsConnection *nats.Conn, sink ApplicationMessageSink) error
+	Stop() error
 	HandleIncomingPacket(meshPacket *pb.MeshPacket) error
 }

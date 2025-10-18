@@ -2,18 +2,17 @@ package meshtastic
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
-	"log"
 	"math/rand/v2"
 	"sync"
 	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/client"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
+	"github.com/charmbracelet/log"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/proto"
 )
 
 // AQ==
@@ -37,6 +36,10 @@ type Node struct {
 
 	serialPortName   string
 	meshtasticClient *MeshtasticClient
+
+	retransmitForward  bool
+	retransmitPeriod   []types.Duration
+	retransmitJitterMs uint32
 
 	applications []Application
 
@@ -69,6 +72,12 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		meshtasticClient: NewMeshtasticClient(),
 
 		eventLoop: event_loop.NewEventLoop(),
+	}
+
+	if config.Retransmit != (*RetransmitConfiguration)(nil) {
+		node.retransmitForward = config.Retransmit.Forward
+		node.retransmitPeriod = config.Retransmit.Period
+		node.retransmitJitterMs = uint32(time.Duration(config.Retransmit.Jitter) / time.Millisecond)
 	}
 
 	for _, ch := range config.Channels {
@@ -124,8 +133,6 @@ func (n *Node) Start() error {
 						n.handlePacket(meshPacket)
 						packetHandled = true
 						break
-					} else {
-						log.Printf("Channel %d decode failed: %s", channel.id, err.Error())
 					}
 				}
 
@@ -133,11 +140,11 @@ func (n *Node) Start() error {
 					n.handleUnknownPacket(packet)
 				}
 
-				if !isForThisNode {
+				if !isForThisNode && n.retransmitForward {
 					// This is not out packet - retransmit it
 					n.eventLoop.Post(func(el event_loop.EventLoop) {
 						n.retransmitPacket(packet)
-					}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
+					}, time.Now().Add(time.Duration(1000+rand.Uint32N(n.retransmitJitterMs))*time.Millisecond))
 				}
 			}
 		}
@@ -151,7 +158,7 @@ func (n *Node) Start() error {
 			case <-n.ctx.Done():
 				break loop
 			case err := <-n.meshtasticClient.Errors:
-				log.Println(err.Error())
+				log.With("err", err).Error("Client error")
 			}
 		}
 	})
@@ -193,49 +200,6 @@ func (n *Node) GetChannel(channelId uint32) *Channel {
 	return nil
 }
 
-func (n *Node) SendText(channelId uint32, toNode uint32, text string) error {
-	channel := n.GetChannel(channelId)
-
-	if channel == nil {
-		return fmt.Errorf("node does not have channel id %d", channelId)
-	}
-
-	meshPacket := pb.MeshPacket{
-		From:     n.id,
-		To:       toNode,
-		Channel:  channelId,
-		Id:       rand.Uint32(), // @todo Have a better way to inject packet IDs
-		WantAck:  false,
-		ViaMqtt:  false,
-		HopStart: 7,
-		HopLimit: 7,
-		PayloadVariant: &pb.MeshPacket_Decoded{
-			Decoded: &pb.Data{
-				Portnum: pb.PortNum_TEXT_MESSAGE_APP,
-				Payload: []byte(text),
-			},
-		},
-	}
-
-	data, err := channel.EncodePacket(&meshPacket)
-	if err != nil {
-		return err
-	}
-
-	n.meshtasticClient.OutgoingPackets <- data
-
-	// Retransmit
-	n.eventLoop.Post(func(el event_loop.EventLoop) {
-		n.meshtasticClient.OutgoingPackets <- data
-	}, time.Now().Add(time.Second*3))
-
-	n.eventLoop.Post(func(el event_loop.EventLoop) {
-		n.meshtasticClient.OutgoingPackets <- data
-	}, time.Now().Add(time.Second*7))
-
-	return nil
-}
-
 // ApplicationMessageSink interface
 func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, portNum pb.PortNum, payload []byte) error {
 	channel := n.GetChannel(channelId)
@@ -268,16 +232,18 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, port
 
 	n.meshtasticClient.OutgoingPackets <- data
 
-	// Retransmit
-	/*
-		n.eventLoop.Post(func(el event_loop.EventLoop) {
-			n.meshtasticClient.OutgoingPackets <- data
-		}, time.Now().Add(time.Second*3))
+	log.With(
+		"channel", channelId,
+		"to", fmt.Sprintf("%x", destination),
+		"portNum", portNum,
+	).Debug("Outgoing packet")
 
+	// Retransmit
+	for _, period := range n.retransmitPeriod {
 		n.eventLoop.Post(func(el event_loop.EventLoop) {
 			n.meshtasticClient.OutgoingPackets <- data
-		}, time.Now().Add(time.Second*7))
-	*/
+		}, time.Now().Add(time.Duration(period)).Add(time.Duration(rand.Uint32N(n.retransmitJitterMs*uint32(time.Millisecond)))))
+	}
 
 	return nil
 }
@@ -289,47 +255,55 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 		return
 	}
 
-	log.Printf("RSSI: %ddBm, SNR: %fdB\n", meshPacket.RxRssi, meshPacket.RxSnr)
+	log.With(
+		"RSSI", fmt.Sprintf("%ddBm", meshPacket.RxRssi),
+		"SNR", fmt.Sprintf("%fdB", meshPacket.RxSnr),
+		"From", fmt.Sprintf("%x", meshPacket.From),
+		"To", fmt.Sprintf("%x", meshPacket.To),
+		"Channel", meshPacket.Channel,
+		"PortNum", decoded.Decoded.Portnum,
+	).Debug("Received packet")
 
 	for _, app := range n.applications {
 		if app.GetPortNum() == decoded.Decoded.Portnum {
 			err := app.HandleIncomingPacket(meshPacket)
 			if err != nil {
-				log.Println(err)
+				log.With("err", err).Error("Failed processing incoming packet")
 			}
 		}
 	}
 
-	switch decoded.Decoded.Portnum {
-	case pb.PortNum_TEXT_MESSAGE_APP:
-		log.Printf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
-		if n.natsConn != nil {
-			n.natsConn.Publish("meshtastic.text", decoded.Decoded.Payload)
+	/*
+		switch decoded.Decoded.Portnum {
+		case pb.PortNum_TEXT_MESSAGE_APP:
+			log.Debugf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
+			if n.natsConn != nil {
+				n.natsConn.Publish("meshtastic.text", decoded.Decoded.Payload)
+			}
+		case pb.PortNum_NODEINFO_APP:
+			user := &pb.User{}
+			err := proto.Unmarshal(decoded.Decoded.Payload, user)
+			if err == nil {
+				log.Debugf("NODE INFO from %x: %v\n", meshPacket.From, user)
+			} else {
+				log.Debug("NODE INFO: unable to decode")
+			}
+		case pb.PortNum_TELEMETRY_APP:
+			telemetry := &pb.Telemetry{}
+			err := proto.Unmarshal(decoded.Decoded.Payload, telemetry)
+			if err == nil {
+				log.Debugf("TELEMETRY %x: %v\n", meshPacket.From, telemetry)
+			} else {
+				log.Debug("TELEMETRY: unable to decode")
+			}
+		default:
+			log.Printf("Unknown message: %v\n", decoded)
 		}
-	case pb.PortNum_NODEINFO_APP:
-		user := &pb.User{}
-		err := proto.Unmarshal(decoded.Decoded.Payload, user)
-		if err == nil {
-			log.Printf("NODE INFO from %x: %v\n", meshPacket.From, user)
-		} else {
-			log.Println("NODE INFO: unable to decode")
-		}
-	case pb.PortNum_TELEMETRY_APP:
-		telemetry := &pb.Telemetry{}
-		err := proto.Unmarshal(decoded.Decoded.Payload, telemetry)
-		if err == nil {
-			log.Printf("TELEMETRY %x: %v\n", meshPacket.From, telemetry)
-		} else {
-			log.Println("TELEMETRY: unable to decode")
-		}
-	default:
-		log.Printf("Unknown message: %v\n", decoded)
-	}
+	*/
 }
 
 func (n *Node) handleUnknownPacket(packet *client.PacketReceived) {
-	log.Printf("handleUnknownPacket %v\n", packet)
-	log.Println(hex.EncodeToString(packet.Data))
+	log.Debugf("Unhandled packet %v\n", packet)
 }
 
 func (n *Node) retransmitPacket(packet *client.PacketReceived) {
@@ -348,7 +322,7 @@ func (n *Node) retransmitPacket(packet *client.PacketReceived) {
 	copy(data, packet.Data)
 	data[12] = flags
 
-	log.Println("Retransmitting incoming packet")
+	log.Debug("Retransmitting incoming packet")
 
 	n.eventLoop.Post(func(el event_loop.EventLoop) {
 		n.meshtasticClient.OutgoingPackets <- data

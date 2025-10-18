@@ -15,6 +15,11 @@ radio:
   bandwidth: 250
   coding_rate: "4/5"
 
+retransmit:
+  forward: true
+  period: [ "3s", "7s"]
+  jitter: "1s"
+
 channels:
   - id: 0
     name: "LongFast"
@@ -22,3 +27,7 @@ channels:
   - id: 1
     name: "Private"
     encryption_key: "NRHtkaJFJyV1ftZ6GluFNR1rBr3MeqHvBmyIKaho4VY="
+
+node_info:
+  channel: 0
+  publish_period: "3h"
