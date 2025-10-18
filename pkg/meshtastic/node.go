@@ -135,12 +135,9 @@ func (n *Node) Start() error {
 
 				if !isForThisNode {
 					// This is not out packet - retransmit it
-					/*
-						capturedPacket := *packet
-						n.eventLoop.Post(func(el event_loop.EventLoop) {
-							n.retransmitPacket(&capturedPacket)
-						}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
-					*/
+					n.eventLoop.Post(func(el event_loop.EventLoop) {
+						n.retransmitPacket(packet)
+					}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
 				}
 			}
 		}
@@ -348,6 +345,7 @@ func (n *Node) retransmitPacket(packet *client.PacketReceived) {
 	flags = (flags & 0xF8) | hopLimit
 
 	data := make([]byte, len(packet.Data))
+	copy(data, packet.Data)
 	data[12] = flags
 
 	log.Println("Retransmitting incoming packet")
