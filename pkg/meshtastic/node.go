@@ -135,10 +135,12 @@ func (n *Node) Start() error {
 
 				if !isForThisNode {
 					// This is not out packet - retransmit it
-					capturedPacket := *packet
-					n.eventLoop.Post(func(el event_loop.EventLoop) {
-						n.retransmitPacket(&capturedPacket)
-					}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
+					/*
+						capturedPacket := *packet
+						n.eventLoop.Post(func(el event_loop.EventLoop) {
+							n.retransmitPacket(&capturedPacket)
+						}, time.Now().Add(time.Duration(rand.IntN(3000)+1000)*time.Millisecond))
+					*/
 				}
 			}
 		}
