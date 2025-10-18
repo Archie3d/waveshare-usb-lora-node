@@ -9,9 +9,11 @@ import (
 )
 
 type TextApplicationIncomingMessage struct {
-	ChannelId uint32 `json:"channel"`
-	From      uint32 `json:"from"`
-	Text      string `json:"text"`
+	ChannelId uint32  `json:"channel"`
+	From      uint32  `json:"from"`
+	Text      string  `json:"text"`
+	Rssi      int32   `json:"rssi"`
+	Snr       float32 `json:"snr"`
 }
 
 type TextApplicationOutgoingMessage struct {
@@ -75,6 +77,8 @@ func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) erro
 			ChannelId: meshPacket.Channel,
 			From:      meshPacket.From,
 			Text:      string(decoded.Decoded.Payload),
+			Rssi:      meshPacket.RxRssi,
+			Snr:       meshPacket.RxSnr,
 		}
 
 		jsonMessage, err := json.Marshal(textMessage)

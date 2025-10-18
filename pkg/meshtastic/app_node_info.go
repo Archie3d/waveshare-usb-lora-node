@@ -8,10 +8,24 @@ import (
 	"time"
 
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 )
+
+type NodeInfoApplicationIncomingMessage struct {
+	ChannelId  uint32  `json:"channel"`
+	From       uint32  `json:"from"`
+	Id         string  `json:"id"`
+	LongName   string  `json:"long_name"`
+	ShortName  string  `json:"short_name"`
+	MacAddress string  `json:"mac_addess"`
+	HwModel    uint32  `json:"hw_model"`
+	PublicKey  string  `json:"public_key"`
+	Rssi       int32   `json:"rssi"`
+	Snr        float32 `json:"snr"`
+}
 
 type NodeInfoApplication struct {
 	config          *NodeConfiguration
@@ -70,7 +84,20 @@ func (app *NodeInfoApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) 
 		return err
 	}
 
-	jsonMessage, err := json.Marshal(&user)
+	message := &NodeInfoApplicationIncomingMessage{
+		ChannelId:  meshPacket.Channel,
+		From:       meshPacket.From,
+		Id:         user.Id,
+		LongName:   user.LongName,
+		ShortName:  user.ShortName,
+		MacAddress: types.MacAddress(user.Macaddr).String(),
+		HwModel:    uint32(user.HwModel),
+		PublicKey:  types.CryptoKey(user.PublicKey).String(),
+		Rssi:       meshPacket.RxRssi,
+		Snr:        meshPacket.RxSnr,
+	}
+
+	jsonMessage, err := json.Marshal(&message)
 
 	if err != nil {
 		return err

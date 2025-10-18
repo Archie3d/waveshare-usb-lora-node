@@ -1,9 +1,8 @@
 id: 0x1c6406e9
-short_name: "WSNode"
-long_name: "WaveshareNode"
+short_name: "WSN1"
+long_name: "WaveshareNode1"
 mac_address: "DA:B4:1C:64:06:e9"
 hw_model: 255
-#public_key: "dHoq1lfsCgG5CP+XAI24vyWZX6xXXKa9K+Yp3s4XCok="
 public_key: "cUzgqk1Pk4D+iJ4Ijx6mUls/RS+lT78d/DG4wPIsgf4="
 
 nats_url: "nats://localhost:4222"

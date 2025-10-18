@@ -15,15 +15,7 @@ func (m MacAddress) AsByteArray() []byte {
 }
 
 func (m MacAddress) MarshalYAML() (any, error) {
-	var value string = ""
-	for _, b := range m {
-		if len(value) > 0 {
-			value = value + ":"
-		}
-		value = value + fmt.Sprintf("%x", b)
-	}
-
-	return value, nil
+	return m.String(), nil
 }
 
 func (m *MacAddress) UnmarshalYAML(node *yaml.Node) error {
@@ -45,4 +37,17 @@ func (m *MacAddress) UnmarshalYAML(node *yaml.Node) error {
 	*m = MacAddress(mac)
 
 	return nil
+}
+
+func (m MacAddress) String() string {
+	var value string = ""
+	for _, b := range m {
+		if len(value) > 0 {
+			value = value + ":"
+		}
+		value = value + fmt.Sprintf("%x", b)
+	}
+
+	return value
+
 }
