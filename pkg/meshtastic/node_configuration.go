@@ -10,7 +10,7 @@ import (
 // See https://dev.to/ilyakaznacheev/a-clean-way-to-pass-configs-in-a-go-application-1g64
 
 type NodeConfiguration struct {
-	Id         uint32           `yaml:"id"`
+	Id         types.NodeId     `yaml:"id"`
 	ShortName  string           `yaml:"short_name"`
 	LongName   string           `yaml:"long_name"`
 	MacAddress types.MacAddress `yaml:"mac_address"`
@@ -35,6 +35,7 @@ type RadioConfiguration struct {
 	SpreadingFactor LoRaSpreadingFactor `yaml:"spreading_factor"`
 	Bandwidth       LoRaBandwidth       `yaml:"bandwidth"`
 	CodingRate      LoRaCodingRate      `yaml:"coding_rate"`
+	ContinuousRssi  bool                `yaml:"continuous_rssi,omitempty"`
 }
 
 type RetransmitConfiguration struct {

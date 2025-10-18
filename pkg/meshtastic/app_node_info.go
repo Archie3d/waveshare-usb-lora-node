@@ -15,16 +15,16 @@ import (
 )
 
 type NodeInfoApplicationIncomingMessage struct {
-	ChannelId  uint32  `json:"channel"`
-	From       uint32  `json:"from"`
-	Id         string  `json:"id"`
-	LongName   string  `json:"long_name"`
-	ShortName  string  `json:"short_name"`
-	MacAddress string  `json:"mac_addess"`
-	HwModel    uint32  `json:"hw_model"`
-	PublicKey  string  `json:"public_key"`
-	Rssi       int32   `json:"rssi"`
-	Snr        float32 `json:"snr"`
+	ChannelId  uint32       `json:"channel"`
+	From       types.NodeId `json:"from"`
+	Id         string       `json:"id"`
+	LongName   string       `json:"long_name"`
+	ShortName  string       `json:"short_name"`
+	MacAddress string       `json:"mac_addess"`
+	HwModel    uint32       `json:"hw_model"`
+	PublicKey  string       `json:"public_key"`
+	Rssi       int32        `json:"rssi"`
+	Snr        float32      `json:"snr"`
 }
 
 type NodeInfoApplication struct {
@@ -98,7 +98,7 @@ func (app *NodeInfoApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) 
 
 	message := &NodeInfoApplicationIncomingMessage{
 		ChannelId:  meshPacket.Channel,
-		From:       meshPacket.From,
+		From:       types.NodeId(meshPacket.From),
 		Id:         user.Id,
 		LongName:   user.LongName,
 		ShortName:  user.ShortName,
@@ -143,8 +143,8 @@ func (app *NodeInfoApplication) publishNodeInfo() {
 	}
 
 	app.messageSink.SendApplicationMessage(
-		uint32(0),          // Channel
-		uint32(0xFFFFFFFF), // Broadcast
+		uint32(0),                // Channel
+		types.NodeId(0xFFFFFFFF), // Broadcast
 		app.GetPortNum(),
 		bytes,
 	)

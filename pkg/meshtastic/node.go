@@ -21,15 +21,16 @@ var defaultPublicKey = []byte{0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 0x
 const defaultChannelName = "LongFast"
 
 type Node struct {
-	id         uint32
+	id         types.NodeId
 	shortName  string
 	longName   string
 	macAddress []byte
 	hwModel    uint32
 	publicKey  []byte
 
-	natsUrl  string
-	natsConn *nats.Conn
+	natsUrl           string
+	natsConn          *nats.Conn
+	natsSubjectPrefix string
 
 	channels    []*Channel
 	radioConfig RadioConfiguration
@@ -59,8 +60,9 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		hwModel:    config.HwModel,
 		publicKey:  config.PublicKey,
 
-		natsUrl:  config.NatsUrl,
-		natsConn: nil,
+		natsUrl:           config.NatsUrl,
+		natsConn:          nil,
+		natsSubjectPrefix: config.NatsSubjectPrefix,
 
 		channels: []*Channel{
 			NewChannel(0, defaultChannelName, defaultPublicKey),
@@ -129,7 +131,7 @@ func (n *Node) Start() error {
 					meshPacket, err := channel.DecodePacket(packet)
 
 					if err == nil && meshPacket != nil {
-						isForThisNode = meshPacket.To == n.id
+						isForThisNode = types.NodeId(meshPacket.To) == n.id
 						n.handlePacket(meshPacket)
 						packetHandled = true
 						break
@@ -145,6 +147,24 @@ func (n *Node) Start() error {
 					n.eventLoop.Post(func(el event_loop.EventLoop) {
 						n.retransmitPacket(packet)
 					}, time.Now().Add(time.Duration(1000+rand.Uint32N(n.retransmitJitterMs))*time.Millisecond))
+				}
+			}
+		}
+	})
+
+	// RSSI
+	n.wg.Go(func() {
+	loop:
+		for {
+			select {
+			case <-n.ctx.Done():
+				break loop
+			case rssi := <-n.meshtasticClient.Rssi:
+				if n.natsConn != nil {
+					n.natsConn.Publish(
+						fmt.Sprintf("%s.rssi", n.natsSubjectPrefix),
+						[]byte(fmt.Sprintf("{\"timestamp\":%d, \"rssi\": %d}", time.Now().UnixMilli(), rssi)),
+					)
 				}
 			}
 		}
@@ -201,7 +221,7 @@ func (n *Node) GetChannel(channelId uint32) *Channel {
 }
 
 // ApplicationMessageSink interface
-func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, portNum pb.PortNum, payload []byte) error {
+func (n *Node) SendApplicationMessage(channelId uint32, destination types.NodeId, portNum pb.PortNum, payload []byte) error {
 	channel := n.GetChannel(channelId)
 
 	if channel == nil {
@@ -209,8 +229,8 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, port
 	}
 
 	meshPacket := pb.MeshPacket{
-		From:     n.id,
-		To:       destination,
+		From:     uint32(n.id),
+		To:       uint32(destination),
 		Channel:  channelId,
 		Id:       rand.Uint32(), // @todo Have a better way to inject packet IDs
 		WantAck:  false,
@@ -234,7 +254,7 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination uint32, port
 
 	log.With(
 		"channel", channelId,
-		"to", fmt.Sprintf("%x", destination),
+		"to", destination,
 		"portNum", portNum,
 	).Debug("Outgoing packet")
 

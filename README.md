@@ -30,7 +30,7 @@ sudo usermod -aG dialout $USER
 Node configuration should be provided as YAML file. Here is an example configuration:
 
 ```yaml
-id: 0x12345678      # Node unique ID
+id: "12345678"      # Node unique ID (32-bits hexadecimal number)
 short_name: "Nd"    # Node short name (keep it to 2-4 characters)
 long_name: "My Node Name"   # Node's long name
 mac_address: "AB:CD:12:34:56:78"    # Node MAC address (derived from node ID)
@@ -50,6 +50,7 @@ radio:
   spreading_factor: 11      # LoRa parameters
   bandwidth: 250            # Keep these values for Meshtastic LongFast communication
   coding_rate: "4/5"
+  continuous_rssi: false    # Set to true to receive continuous RSSI when in RX mode
 
 retransmit:
   forward: true             # Whether to forward received packets (public or unknown)
@@ -68,3 +69,28 @@ node_info:              # Parameters used by the Node Info app
   channel: 0            # Transmission channel number (usually 0)
   publish_period: "3h"  # Broadcast period (how often this node info will be sent out)
 ```
+
+## Sending a text message
+To send a message publish `{"channel":0, "to":"ffffffff", "text":"message"}` JSON to `<nats_subject_prefix>.app.text.outgoing` subject:
+```bash
+nats pub mesh.my_node.app.text.outgoing "{\"channel\":0, \"to\":\"ffffffff\", \"text\":\"Hello\"}"
+```
+
+## Receiving text messages
+To reveive messages, subscribe to `<nats_subject_prefix>.app.text.incoming`:
+```bash
+nats sub mesh.my_node.app.text.incoming
+```
+
+## Receiving nodes info
+Discovered nodes info is publishedon `<nats_subject_prefix>.app.node_info.incoming`:
+```bash
+nats sub mesh.my_node.app.node_info.incoming
+```
+
+## Receiving continuous RSSI
+When `continuous_rssi: true` is set in the configuration, RF signalstrength will be continuously published to `<nats_subject_prefix>.rssi` subject. Each message is a JSON object containing the timestamp (Unix time in ms) and RSSI in dBm:
+```json
+{"timestamp":1760828303844, "rssi": -93}
+```
+RSSI only gets published when device is in RX mode, during transmissions RSSI is not available.

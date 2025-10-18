@@ -4,23 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 	"github.com/charmbracelet/log"
 	pb "github.com/meshtastic/go/generated"
 	"github.com/nats-io/nats.go"
 )
 
 type TextApplicationIncomingMessage struct {
-	ChannelId uint32  `json:"channel"`
-	From      uint32  `json:"from"`
-	Text      string  `json:"text"`
-	Rssi      int32   `json:"rssi"`
-	Snr       float32 `json:"snr"`
+	ChannelId uint32       `json:"channel"`
+	From      types.NodeId `json:"from"`
+	Text      string       `json:"text"`
+	Rssi      int32        `json:"rssi"`
+	Snr       float32      `json:"snr"`
 }
 
 type TextApplicationOutgoingMessage struct {
-	ChannelId uint32 `json:"channel"`
-	To        uint32 `json:"to"`
-	Text      string `json:"text"`
+	ChannelId uint32       `json:"channel"`
+	To        types.NodeId `json:"to"`
+	Text      string       `json:"text"`
 }
 
 type TextApplication struct {
@@ -36,8 +37,8 @@ func NewTextApplication(config *NodeConfiguration) *TextApplication {
 		config:          config,
 		natsConn:        nil,
 		messageSink:     nil,
-		outgoingSubject: config.NatsSubjectPrefix + ".app.text_message.outgoing",
-		incomingSubject: config.NatsSubjectPrefix + ".app.text_message.incoming",
+		outgoingSubject: config.NatsSubjectPrefix + ".app.text.outgoing",
+		incomingSubject: config.NatsSubjectPrefix + ".app.text.incoming",
 	}
 }
 
@@ -89,7 +90,7 @@ func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) erro
 	if app.natsConn != nil {
 		textMessage := TextApplicationIncomingMessage{
 			ChannelId: meshPacket.Channel,
-			From:      meshPacket.From,
+			From:      types.NodeId(meshPacket.From),
 			Text:      string(decoded.Decoded.Payload),
 			Rssi:      meshPacket.RxRssi,
 			Snr:       meshPacket.RxSnr,

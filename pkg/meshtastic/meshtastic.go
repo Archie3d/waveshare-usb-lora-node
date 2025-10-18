@@ -36,13 +36,15 @@ type MeshtasticClient struct {
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 
-	rssi_dBm     atomic.Int32
-	timeOnAir_ms atomic.Uint32
+	rssi_dBm       atomic.Int32
+	timeOnAir_ms   atomic.Uint32
+	continuousRssi bool
 
 	seenPackets []PacketTimespamp
 
 	IncomingPackets chan *client.PacketReceived
 	OutgoingPackets chan []byte
+	Rssi            chan int32
 
 	Errors chan error
 }
@@ -53,6 +55,7 @@ func NewMeshtasticClient() *MeshtasticClient {
 		apiClient:       client.NewApiClient(),
 		IncomingPackets: make(chan *client.PacketReceived, 10),
 		OutgoingPackets: make(chan []byte, 10),
+		Rssi:            make(chan int32, 10),
 		Errors:          make(chan error, 10),
 	}
 }
@@ -107,6 +110,8 @@ func (c *MeshtasticClient) Close() error {
 }
 
 func (c *MeshtasticClient) initRadio(radioConfig *RadioConfiguration) error {
+	c.continuousRssi = radioConfig.ContinuousRssi
+
 	// Switch back to RX once the message has been transmitted
 	if _, err := c.apiClient.SendRequest(&client.RxTxFallbackMode{
 		FallbackMode: client.FALLBACK_STANDBY_XOSC_RX,
@@ -194,7 +199,14 @@ func (c *MeshtasticClient) deinitRadio() error {
 }
 
 func (c *MeshtasticClient) switchToRx() error {
-	_, err := c.apiClient.SendRequest(&client.SwitchToRx{}, time.Second)
+	_, err := c.apiClient.SendRequest(
+		&client.SwitchToRx{
+			Timeout_ms:           0,
+			EnableContinuousRSSI: c.continuousRssi,
+		},
+		time.Second,
+	)
+
 	if err != nil {
 		return fmt.Errorf("failed to switch to RX mode: %v", err)
 	}
@@ -238,6 +250,9 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 	} else if rssi, ok := msg.(*client.ContinuoisRSSI); ok {
 		// Capture RSSI
 		c.rssi_dBm.Store(int32(rssi.RSSI_dBm))
+		if c.continuousRssi {
+			c.Rssi <- int32(rssi.RSSI_dBm)
+		}
 	}
 
 	if shouldSwitchToRx {
