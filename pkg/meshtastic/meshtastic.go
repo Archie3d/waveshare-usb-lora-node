@@ -293,7 +293,7 @@ func (c *MeshtasticClient) transmitPacket(packet []byte) error {
 	// Purge records of older packets
 	c.forgetOldSeenPackets()
 
-	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 5000, Data: packet, Busy: false}, 5*time.Second)
+	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 30000, Data: packet, Busy: false}, 30*time.Second)
 	if err != nil {
 		return err
 	}

@@ -46,6 +46,8 @@ type Node struct {
 
 	eventLoop event_loop.EventLoop
 
+	packetIdGenerator types.PacketIdGenerator
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -74,6 +76,8 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		meshtasticClient: NewMeshtasticClient(),
 
 		eventLoop: event_loop.NewEventLoop(),
+
+		packetIdGenerator: *types.NewPacketIdGenerator(16),
 	}
 
 	if config.Retransmit != (*RetransmitConfiguration)(nil) {
@@ -232,7 +236,7 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination types.NodeId
 		From:     uint32(n.id),
 		To:       uint32(destination),
 		Channel:  channelId,
-		Id:       rand.Uint32(), // @todo Have a better way to inject packet IDs
+		Id:       n.packetIdGenerator.GetNext(),
 		WantAck:  false,
 		ViaMqtt:  false,
 		HopStart: 7,
