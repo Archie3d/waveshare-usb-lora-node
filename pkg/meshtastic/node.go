@@ -182,7 +182,9 @@ func (n *Node) Start() error {
 			case <-n.ctx.Done():
 				break loop
 			case err := <-n.meshtasticClient.Errors:
-				log.With("err", err).Error("Client error")
+				log.Error(err)
+			case err := <-n.meshtasticClient.Warnings:
+				log.Warn(err)
 			}
 		}
 	})

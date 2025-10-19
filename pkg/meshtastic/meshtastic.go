@@ -46,7 +46,8 @@ type MeshtasticClient struct {
 	OutgoingPackets chan []byte
 	Rssi            chan int32
 
-	Errors chan error
+	Errors   chan error
+	Warnings chan error
 }
 
 // Create a new Meshtastic client but do not run it yet.
@@ -57,6 +58,7 @@ func NewMeshtasticClient() *MeshtasticClient {
 		OutgoingPackets: make(chan []byte, 10),
 		Rssi:            make(chan int32, 10),
 		Errors:          make(chan error, 10),
+		Warnings:        make(chan error, 10),
 	}
 }
 
@@ -76,6 +78,8 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 	}
 
 	c.wg.Go(func() {
+		var retransmissions atomic.Int32
+
 	loop:
 		for {
 			select {
@@ -85,8 +89,29 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 				c.handleRadioMessage(radioMessage)
 			case outgoingPacket := <-c.OutgoingPackets:
 				err := c.transmitPacket(outgoingPacket)
+
 				if err != nil {
-					c.Errors <- fmt.Errorf("packet transmission failed: %v", err)
+					_, ok := err.(*types.BusyError)
+					if ok {
+						if retransmissions.Load() > 2 {
+							c.Errors <- fmt.Errorf("Too many retransmissions, packet dropped")
+						} else {
+							c.Warnings <- fmt.Errorf("Device is busy, packet is scheduled for retransmission")
+							retransmissions.Add(1)
+							go func() {
+								// Device is busy, trying again after some time
+								select {
+								case <-c.ctx.Done():
+									return
+								case <-time.After(1 * time.Second):
+									c.OutgoingPackets <- outgoingPacket
+									retransmissions.Add(-1)
+								}
+							}()
+						}
+					} else {
+						c.Errors <- fmt.Errorf("packet transmission failed: %v", err)
+					}
 				}
 			}
 		}
@@ -204,7 +229,7 @@ func (c *MeshtasticClient) switchToRx() error {
 			Timeout_ms:           0,
 			EnableContinuousRSSI: c.continuousRssi,
 		},
-		time.Second,
+		3*time.Second,
 	)
 
 	if err != nil {
@@ -293,7 +318,7 @@ func (c *MeshtasticClient) transmitPacket(packet []byte) error {
 	// Purge records of older packets
 	c.forgetOldSeenPackets()
 
-	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 30000, Data: packet, Busy: false}, 30*time.Second)
+	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 3000, Data: packet, Busy: false}, 5*time.Second)
 	if err != nil {
 		return err
 	}
