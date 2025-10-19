@@ -25,6 +25,8 @@ type event_loop struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	wake chan bool
+
 	mutex          sync.Mutex
 	eventQueue     *eventPoint
 	eventQueueTail *eventPoint
@@ -35,6 +37,7 @@ func NewEventLoop() EventLoop {
 	return &event_loop{
 		ctx:        ctx,
 		cancel:     cancel,
+		wake:       make(chan bool, 1),
 		eventQueue: nil,
 	}
 }
@@ -47,6 +50,8 @@ loop:
 		select {
 		case <-el.ctx.Done():
 			break loop
+		case <-el.wake:
+			sleepDuration = el.processEvents()
 		case <-time.After(sleepDuration):
 			sleepDuration = el.processEvents()
 		}
@@ -65,8 +70,12 @@ func (el *event_loop) processEvents() time.Duration {
 	for event != nil {
 
 		if time.Since(event.scheduledBy) > 0 {
-			// event has expired - execute it
+			// Event has expired - execute it
 			event.callback(el)
+
+			// Event callback may produce more events, so we have
+			// do cancel sleep here
+			sleepDuration = time.Duration(0)
 		} else {
 			// event cannot be scheduled just yet
 			postponeBy := time.Until(event.scheduledBy)
@@ -74,14 +83,40 @@ func (el *event_loop) processEvents() time.Duration {
 				sleepDuration = postponeBy
 			}
 
-			el.Post(event.callback, event.scheduledBy)
+			el.enqueue(event)
 		}
 
 		// Move to the next event
 		event = event.next
 	}
 
+	if sleepDuration < 0 {
+		// No events, sleep
+		sleepDuration = 100 * time.Millisecond
+	}
+
 	return sleepDuration
+}
+
+func (el *event_loop) enqueue(event *eventPoint) {
+	el.mutex.Lock()
+	defer el.mutex.Unlock()
+
+	if el.eventQueue == nil {
+		el.eventQueue = event
+		el.eventQueueTail = event
+	} else {
+		el.eventQueueTail.next = event
+		el.eventQueueTail = el.eventQueueTail.next
+	}
+}
+
+func (el *event_loop) wakeUp() {
+	select {
+	case el.wake <- true:
+	default:
+		// Already woken up
+	}
 }
 
 func (el *event_loop) Quit() {
@@ -101,14 +136,6 @@ func (el *event_loop) Post(callback CallbackFunc, scheduledBy time.Time) {
 		next:        nil,
 	}
 
-	el.mutex.Lock()
-	defer el.mutex.Unlock()
-
-	if el.eventQueue == nil {
-		el.eventQueue = event
-		el.eventQueueTail = event
-	} else {
-		el.eventQueueTail.next = event
-		el.eventQueueTail = el.eventQueueTail.next
-	}
+	el.enqueue(event)
+	el.wakeUp()
 }
