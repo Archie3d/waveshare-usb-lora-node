@@ -66,6 +66,8 @@ func main() {
 		node.AddApplication(meshtastic.NewNodeInfoApplication(config))
 	}
 
+	node.AddApplication(meshtastic.NewTelementryApplication(config))
+
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
 	}
