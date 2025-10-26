@@ -3,7 +3,11 @@ package meshtastic
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
+	"sync"
+	"time"
 
+	"github.com/Archie3d/waveshare-usb-lora-client/pkg/event_loop"
 	"github.com/Archie3d/waveshare-usb-lora-client/pkg/types"
 	"github.com/charmbracelet/log"
 	pb "github.com/meshtastic/go/generated"
@@ -24,16 +28,25 @@ type DeviceMetricsIncomingMessage struct {
 }
 
 type TelemetryApplication struct {
-	config      *NodeConfiguration
-	natsConn    *nats.Conn
-	messageSink ApplicationMessageSink
+	config          *NodeConfiguration
+	natsConn        *nats.Conn
+	messageSink     ApplicationMessageSink
+	outgoingSubject string
+	incomingSubject string
+	startTime       time.Time
+
+	wg        sync.WaitGroup
+	eventLoop event_loop.EventLoop
 }
 
 func NewTelementryApplication(config *NodeConfiguration) *TelemetryApplication {
 	return &TelemetryApplication{
-		config:      config,
-		natsConn:    nil,
-		messageSink: nil,
+		config:          config,
+		natsConn:        nil,
+		messageSink:     nil,
+		outgoingSubject: config.NatsSubjectPrefix + ".out.telemetry",
+		incomingSubject: config.NatsSubjectPrefix + ".in.telemetry",
+		eventLoop:       event_loop.NewEventLoop(),
 	}
 }
 
@@ -45,19 +58,33 @@ func (app *TelemetryApplication) Start(natsConnection *nats.Conn, sink Applicati
 	app.natsConn = natsConnection
 	app.messageSink = sink
 
-	app.natsConn.Subscribe(
-		app.config.NatsSubjectPrefix+".app.telemetry.device_metrics.outgoing",
-		func(msg *nats.Msg,
-		) {
+	app.startTime = time.Now()
 
-		})
+	app.wg.Go(func() {
+		app.eventLoop.Run()
+	})
 
 	log.Info("Started Telemetry application")
+
+	if app.config.Telemetry.DeviceMetrics != nil {
+		app.eventLoop.Post(func(el event_loop.EventLoop) {
+			app.publishDeviceMetrics()
+		}, time.Now().Add(time.Duration(rand.Uint32N(20)+10)*time.Second))
+
+		log.With(
+			"channel", app.config.Telemetry.DeviceMetrics.Channel,
+			"period", app.config.Telemetry.DeviceMetrics.PublishPeriod.String(),
+		).Info("Started Device Metrics telemetry")
+
+	}
 
 	return nil
 }
 
 func (app *TelemetryApplication) Stop() error {
+	app.eventLoop.Quit()
+	app.wg.Wait()
+
 	return nil
 }
 
@@ -99,7 +126,7 @@ func (app *TelemetryApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket)
 		}
 
 		err = app.natsConn.Publish(
-			app.config.NatsSubjectPrefix+".app.telemetry.device_metrics.incoming",
+			app.incomingSubject+".device_metrics",
 			jsonMessage,
 		)
 		if err != nil {
@@ -108,4 +135,41 @@ func (app *TelemetryApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket)
 	}
 
 	return nil
+}
+
+func (app *TelemetryApplication) publishDeviceMetrics() {
+
+	var batteryLevel uint32 = 101
+	var voltage float32 = 5.0
+	var channelUtilization float32 = 100.0
+	var airUntilTx float32 = 10.0
+	uptimeSeconds := uint32(time.Since(app.startTime).Seconds())
+
+	deviceMetrics := pb.DeviceMetrics{
+		BatteryLevel:       &batteryLevel,
+		Voltage:            &voltage,
+		ChannelUtilization: &channelUtilization,
+		AirUtilTx:          &airUntilTx,
+		UptimeSeconds:      &uptimeSeconds,
+	}
+
+	bytes, err := proto.Marshal(&deviceMetrics)
+
+	if err != nil {
+		log.With("err", err).Warn("Failed to marshal node info data")
+		return
+	}
+
+	app.messageSink.SendApplicationMessage(
+		app.config.Telemetry.DeviceMetrics.Channel, // Channel
+		types.NodeId(0xFFFFFFFF),                   // Broadcast
+		app.GetPortNum(),
+		bytes,
+	)
+
+	publishPeriod := time.Duration(app.config.Telemetry.DeviceMetrics.PublishPeriod)
+
+	app.eventLoop.Post(func(el event_loop.EventLoop) {
+		app.publishDeviceMetrics()
+	}, time.Now().Add(publishPeriod))
 }

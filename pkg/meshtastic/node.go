@@ -262,7 +262,7 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination types.NodeId
 		"channel", channelId,
 		"to", destination,
 		"portNum", portNum,
-	).Debug("Outgoing packet")
+	).Info("Outgoing packet")
 
 	// Retransmit
 	for _, period := range n.retransmitPeriod {

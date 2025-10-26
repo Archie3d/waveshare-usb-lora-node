@@ -37,8 +37,8 @@ func NewTextApplication(config *NodeConfiguration) *TextApplication {
 		config:          config,
 		natsConn:        nil,
 		messageSink:     nil,
-		outgoingSubject: config.NatsSubjectPrefix + ".app.text.outgoing",
-		incomingSubject: config.NatsSubjectPrefix + ".app.text.incoming",
+		outgoingSubject: config.NatsSubjectPrefix + ".out.text",
+		incomingSubject: config.NatsSubjectPrefix + ".in.text",
 	}
 }
 

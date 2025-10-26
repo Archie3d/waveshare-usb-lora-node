@@ -73,19 +73,19 @@ node_info:              # Parameters used by the Node Info app
 ## Sending a text message
 To send a message publish `{"channel":0, "to":"ffffffff", "text":"message"}` JSON to `<nats_subject_prefix>.app.text.outgoing` subject:
 ```bash
-nats pub mesh.my_node.app.text.outgoing "{\"channel\":0, \"to\":\"ffffffff\", \"text\":\"Hello\"}"
+nats pub mesh.my_node.out.text "{\"channel\":0, \"to\":\"ffffffff\", \"text\":\"Hello\"}"
 ```
 
 ## Receiving text messages
 To reveive messages, subscribe to `<nats_subject_prefix>.app.text.incoming`:
 ```bash
-nats sub mesh.my_node.app.text.incoming
+nats sub mesh.my_node.in.text
 ```
 
 ## Receiving nodes info
 Discovered nodes info is publishedon `<nats_subject_prefix>.app.node_info.incoming`:
 ```bash
-nats sub mesh.my_node.app.node_info.incoming
+nats sub mesh.my_node.in.node_info
 ```
 
 ## Receiving continuous RSSI

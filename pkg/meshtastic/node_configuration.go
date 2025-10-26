@@ -27,6 +27,8 @@ type NodeConfiguration struct {
 	Retransmit *RetransmitConfiguration `yaml:"retransmit"`
 
 	NodeInfo *NodeInfoConfiguration `yaml:"node_info,omitempty"`
+
+	Telemetry *TelemetryConfiguration `yaml:"telemetry"`
 }
 
 type RadioConfiguration struct {
@@ -51,6 +53,15 @@ type ChannelConfiguration struct {
 }
 
 type NodeInfoConfiguration struct {
+	Channel       uint32         `yaml:"channel"`
+	PublishPeriod types.Duration `yaml:"publish_period"`
+}
+
+type TelemetryConfiguration struct {
+	DeviceMetrics *TelemetryDeviceMetricsConfiguration `yaml:"device_metrics"`
+}
+
+type TelemetryDeviceMetricsConfiguration struct {
 	Channel       uint32         `yaml:"channel"`
 	PublishPeriod types.Duration `yaml:"publish_period"`
 }

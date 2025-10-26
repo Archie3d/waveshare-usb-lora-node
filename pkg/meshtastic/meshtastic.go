@@ -266,7 +266,10 @@ func (c *MeshtasticClient) handleRadioMessage(msg client.ApiMessage) {
 
 		// Capture total time on air
 		c.timeOnAir_ms.Add(transmitted.TimeOnAir_ms)
-		log.With("timeOnAir", time.Duration(transmitted.TimeOnAir_ms)*time.Millisecond).Debug("Packet transmitted")
+		log.With(
+			"timeOnAir", time.Duration(transmitted.TimeOnAir_ms)*time.Millisecond,
+			"totalTimeOnAir", time.Duration(c.timeOnAir_ms.Load())*time.Millisecond,
+		).Debug("Packet transmitted")
 	} else if _, ok := msg.(*client.RxTxTimeout); ok {
 		shouldSwitchToRx = true
 		// Timeout receiving or transmitting the message.

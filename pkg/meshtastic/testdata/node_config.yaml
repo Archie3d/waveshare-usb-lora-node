@@ -32,3 +32,8 @@ channels:
 node_info:
   channel: 0
   publish_period: "3h"
+
+telemetry:
+  device_metrics:
+    channel: 0
+    publish_period: "1h"

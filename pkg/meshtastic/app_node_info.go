@@ -3,6 +3,7 @@ package meshtastic
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -31,7 +32,6 @@ type NodeInfoApplication struct {
 	config          *NodeConfiguration
 	natsConn        *nats.Conn
 	messageSink     ApplicationMessageSink
-	outgoingSubject string
 	incomingSubject string
 	publishPeriod   time.Duration
 
@@ -45,8 +45,7 @@ func NewNodeInfoApplication(config *NodeConfiguration) *NodeInfoApplication {
 		config:          config,
 		natsConn:        nil,
 		messageSink:     nil,
-		outgoingSubject: config.NatsSubjectPrefix + ".app.node_info.outgoing",
-		incomingSubject: config.NatsSubjectPrefix + ".app.node_info.incoming",
+		incomingSubject: config.NatsSubjectPrefix + ".in.node_info",
 		publishPeriod:   time.Duration(config.NodeInfo.PublishPeriod),
 		eventLoop:       event_loop.NewEventLoop(),
 	}
@@ -66,7 +65,7 @@ func (app *NodeInfoApplication) Start(natsConnection *nats.Conn, sink Applicatio
 
 	app.eventLoop.Post(func(el event_loop.EventLoop) {
 		app.publishNodeInfo()
-	}, time.Now().Add(10*time.Second))
+	}, time.Now().Add(time.Duration(rand.Uint32N(20)+10)*time.Second))
 
 	log.With(
 		"channel", app.config.NodeInfo.Channel,
@@ -143,8 +142,8 @@ func (app *NodeInfoApplication) publishNodeInfo() {
 	}
 
 	app.messageSink.SendApplicationMessage(
-		uint32(0),                // Channel
-		types.NodeId(0xFFFFFFFF), // Broadcast
+		app.config.NodeInfo.Channel, // Channel
+		types.NodeId(0xFFFFFFFF),    // Broadcast
 		app.GetPortNum(),
 		bytes,
 	)
