@@ -2,6 +2,7 @@ package meshtastic
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
 	"sync"
@@ -66,9 +67,7 @@ func NewNode(port string, config *NodeConfiguration) *Node {
 		natsConn:          nil,
 		natsSubjectPrefix: config.NatsSubjectPrefix,
 
-		channels: []*Channel{
-			NewChannel(0, defaultChannelName, defaultPublicKey),
-		},
+		channels: []*Channel{},
 
 		radioConfig: config.Radio,
 
@@ -329,7 +328,7 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 }
 
 func (n *Node) handleUnknownPacket(packet *client.PacketReceived) {
-	log.Debugf("Unhandled packet %v\n", packet)
+	log.With("packet", hex.EncodeToString(packet.Data)).Debug("Unhandled")
 }
 
 func (n *Node) retransmitPacket(packet *client.PacketReceived) {

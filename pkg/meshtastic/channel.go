@@ -39,7 +39,7 @@ func NewChannel(id uint32, name string, key []byte) *Channel {
 func (c *Channel) DecodePacket(packet *client.PacketReceived) (*pb.MeshPacket, error) {
 	hash := packet.Data[13]
 	if hash != c.hash {
-		return nil, fmt.Errorf("channel hash mismatch")
+		return nil, fmt.Errorf("channel hash mismatch (expected %d, received %d)", c.hash, hash)
 	}
 
 	toNode := binary.LittleEndian.Uint32(packet.Data[0:4])
