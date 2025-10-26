@@ -125,7 +125,7 @@ func (app *NodeInfoApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) 
 func (app *NodeInfoApplication) publishNodeInfo() {
 
 	user := pb.User{
-		Id:         fmt.Sprintf("!%x", app.config.Id),
+		Id:         fmt.Sprintf("!%s", app.config.Id),
 		LongName:   app.config.LongName,
 		ShortName:  app.config.ShortName,
 		Macaddr:    app.config.MacAddress.AsByteArray(),

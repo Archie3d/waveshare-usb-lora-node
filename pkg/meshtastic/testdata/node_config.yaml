@@ -14,7 +14,7 @@ radio:
   spreading_factor: 11
   bandwidth: 250
   coding_rate: "4/5"
-  continuous_rssi: true
+  continuous_rssi: false
 
 retransmit:
   forward: true
