@@ -126,3 +126,26 @@ func TestReceivedPacketDecode(t *testing.T) {
 	assert.Equal(t, pb.PortNum_TEXT_MESSAGE_APP, decoded.Decoded.Portnum)
 	assert.Equal(t, "Hello from Waveshare USB!", string(decoded.Decoded.Payload))
 }
+
+/*
+Private message:
+ea2ffd25	To 			25fd2fea
+68643c43	From		433c6468
+3c572524	Packet ID	2425573c
+ef			Flags		WantAck is set
+00			Hash
+0068
+2ce70ee8a8d5e651743013beb3324878ebf42df45158
+*/
+
+/*
+Packet from Heltec V3:
+
+ffffffff	To
+68643c43	From
+73e66127	Packet Id
+e7			Flasg
+08			Hash
+0068
+d40acbe7d253ff92ec
+*/

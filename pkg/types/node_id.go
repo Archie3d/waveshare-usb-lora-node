@@ -25,13 +25,13 @@ func (n *NodeId) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (n NodeId) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%x\"", uint32(n))), nil
+	return []byte(fmt.Sprintf("\"%08x\"", uint32(n))), nil
 }
 
 func (n *NodeId) UnmarshalJSON(data []byte) error {
 	value := string(data)
 	if len(value) > 2 && value[0] == '"' && value[len(value)-1] == '"' {
-		value = value[1 : len(value)-2]
+		value = value[1 : len(value)-1]
 	}
 
 	num, err := strconv.ParseUint(value, 16, 32)

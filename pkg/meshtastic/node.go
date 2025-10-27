@@ -130,6 +130,8 @@ func (n *Node) Start() error {
 				packetHandled := false
 				isForThisNode := false
 
+				log.With("packet", hex.EncodeToString(packet.Data)).Debug("Incoming")
+
 				for _, channel := range n.channels {
 					meshPacket, err := channel.DecodePacket(packet)
 
@@ -233,6 +235,12 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination types.NodeId
 		return fmt.Errorf("node does not have channel id %d", channelId)
 	}
 
+	log.With(
+		"channel", channelId,
+		"to", fmt.Sprintf("%08x", uint32(destination)),
+		"from", fmt.Sprintf("%08x", uint32(n.id)),
+	)
+
 	meshPacket := pb.MeshPacket{
 		From:     uint32(n.id),
 		To:       uint32(destination),
@@ -262,6 +270,8 @@ func (n *Node) SendApplicationMessage(channelId uint32, destination types.NodeId
 		"to", destination,
 		"portNum", portNum,
 	).Info("Outgoing packet")
+
+	log.With("packet", hex.EncodeToString(data)).Debug("Outgoing")
 
 	// Retransmit
 	for _, period := range n.retransmitPeriod {
