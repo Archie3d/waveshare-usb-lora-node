@@ -134,22 +134,25 @@ func (app *TelemetryApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket)
 }
 
 func (app *TelemetryApplication) publishDeviceMetrics() {
-
 	var batteryLevel uint32 = 101
 	var voltage float32 = 5.0
-	var channelUtilization float32 = 100.0
-	var airUntilTx float32 = 10.0
+	var channelUtilization float32 = 0.0 // %, @todo
+	var airUntilTx float32 = 0.0         // %, @todo
 	uptimeSeconds := uint32(time.Since(app.startTime).Seconds())
 
-	deviceMetrics := pb.DeviceMetrics{
-		BatteryLevel:       &batteryLevel,
-		Voltage:            &voltage,
-		ChannelUtilization: &channelUtilization,
-		AirUtilTx:          &airUntilTx,
-		UptimeSeconds:      &uptimeSeconds,
+	telemetry := pb.Telemetry{
+		Variant: &pb.Telemetry_DeviceMetrics{
+			DeviceMetrics: &pb.DeviceMetrics{
+				BatteryLevel:       &batteryLevel,
+				Voltage:            &voltage,
+				ChannelUtilization: &channelUtilization,
+				AirUtilTx:          &airUntilTx,
+				UptimeSeconds:      &uptimeSeconds,
+			},
+		},
 	}
 
-	bytes, err := proto.Marshal(&deviceMetrics)
+	bytes, err := proto.Marshal(&telemetry)
 
 	if err != nil {
 		log.With("err", err).Warn("Failed to marshal node info data")
