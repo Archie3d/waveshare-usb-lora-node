@@ -15,18 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type DeviceMetricsIncomingMessage struct {
-	ChannelId          uint32       `json:"channel"`
-	From               types.NodeId `json:"from"`
-	Rssi               int32        `json:"rssi"`
-	Snr                float32      `json:"snr"`
-	BatteryLevel       uint32       `json:"battery_level"`
-	Voltage            float32      `json:"voltage"`
-	ChannelUtilization float32      `json:"channel_utilization"`
-	AirUntilTx         float32      `json:"air_until_tx"`
-	Uptime             uint32       `json:"uptime"`
-}
-
 type TelemetryApplication struct {
 	config          *NodeConfiguration
 	natsConn        *nats.Conn
@@ -105,36 +93,44 @@ func (app *TelemetryApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket)
 		return err
 	}
 
-	deviceMetrics, ok := telemetry.Variant.(*pb.Telemetry_DeviceMetrics)
+	var subject string = app.incomingSubject
+	var jsonData []byte = nil
 
-	if ok {
-		deviceMetricsMessage := DeviceMetricsIncomingMessage{
-			ChannelId:          meshPacket.Channel,
-			From:               types.NodeId(meshPacket.From),
-			Rssi:               meshPacket.RxRssi,
-			Snr:                meshPacket.RxSnr,
-			BatteryLevel:       *deviceMetrics.DeviceMetrics.BatteryLevel,
-			Voltage:            *deviceMetrics.DeviceMetrics.Voltage,
-			ChannelUtilization: *deviceMetrics.DeviceMetrics.ChannelUtilization,
-			AirUntilTx:         *deviceMetrics.DeviceMetrics.AirUtilTx,
-			Uptime:             *deviceMetrics.DeviceMetrics.UptimeSeconds,
-		}
-
-		jsonMessage, err := json.Marshal(deviceMetricsMessage)
-		if err != nil {
-			return err
-		}
-
-		err = app.natsConn.Publish(
-			app.incomingSubject+".device_metrics",
-			jsonMessage,
-		)
-		if err != nil {
-			return err
-		}
+	switch payload := telemetry.Variant.(type) {
+	case *pb.Telemetry_DeviceMetrics:
+		subject += ".device_metrics"
+		jsonData, err = json.Marshal(payload.DeviceMetrics)
+	case *pb.Telemetry_EnvironmentMetrics:
+		subject += ".environment"
+		jsonData, err = json.Marshal(payload.EnvironmentMetrics)
+	default:
+		return fmt.Errorf("Unsupported telemetry message %T", payload)
 	}
 
-	return nil
+	if err != nil {
+		return err
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(jsonData, &data)
+	if err != nil {
+		return err
+	}
+
+	data["channel"] = meshPacket.Channel
+	data["from"] = types.NodeId(meshPacket.From)
+	data["rssi"] = meshPacket.RxRssi
+	data["snr"] = meshPacket.RxSnr
+
+	jsonData, err = json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return app.natsConn.Publish(
+		subject,
+		jsonData,
+	)
 }
 
 func (app *TelemetryApplication) publishDeviceMetrics() {
