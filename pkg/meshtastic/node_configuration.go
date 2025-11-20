@@ -29,6 +29,8 @@ type NodeConfiguration struct {
 	NodeInfo *NodeInfoConfiguration `yaml:"node_info,omitempty"`
 
 	Telemetry *TelemetryConfiguration `yaml:"telemetry"`
+
+	Position *PositionConfiguration `yaml:"position"`
 }
 
 type RadioConfiguration struct {
@@ -59,6 +61,14 @@ type NodeInfoConfiguration struct {
 
 type TelemetryConfiguration struct {
 	DeviceMetrics *TelemetryDeviceMetricsConfiguration `yaml:"device_metrics"`
+}
+
+type PositionConfiguration struct {
+	Latitude      float64        `yaml:"latitude"`
+	Longitude     float64        `yaml:"longitude"`
+	Altitude      float64        `yaml:"altitude"`
+	Channel       uint32         `yaml:"channel"`
+	PublishPeriod types.Duration `yaml:"publish_period"`
 }
 
 type TelemetryDeviceMetricsConfiguration struct {

@@ -70,6 +70,10 @@ func main() {
 		node.AddApplication(meshtastic.NewTelementryApplication(config))
 	}
 
+	if config.Position != nil {
+		node.AddApplication(meshtastic.NewPositionApplication(config))
+	}
+
 	if err := node.Start(); err != nil {
 		log.Fatal(err)
 	}

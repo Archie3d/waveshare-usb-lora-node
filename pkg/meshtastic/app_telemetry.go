@@ -121,6 +121,7 @@ func (app *TelemetryApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket)
 	data["from"] = types.NodeId(meshPacket.From)
 	data["rssi"] = meshPacket.RxRssi
 	data["snr"] = meshPacket.RxSnr
+	data["hops"] = meshPacket.HopStart - meshPacket.HopLimit
 
 	jsonData, err = json.Marshal(data)
 	if err != nil {

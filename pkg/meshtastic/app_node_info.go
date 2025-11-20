@@ -26,6 +26,7 @@ type NodeInfoApplicationIncomingMessage struct {
 	PublicKey  string       `json:"public_key"`
 	Rssi       int32        `json:"rssi"`
 	Snr        float32      `json:"snr"`
+	Hops       uint32       `json:"hops"`
 }
 
 type NodeInfoApplication struct {
@@ -106,6 +107,7 @@ func (app *NodeInfoApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) 
 		PublicKey:  types.CryptoKey(user.PublicKey).String(),
 		Rssi:       meshPacket.RxRssi,
 		Snr:        meshPacket.RxSnr,
+		Hops:       meshPacket.HopStart - meshPacket.HopLimit,
 	}
 
 	jsonMessage, err := json.Marshal(&message)

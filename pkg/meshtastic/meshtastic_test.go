@@ -128,24 +128,15 @@ func TestReceivedPacketDecode(t *testing.T) {
 }
 
 /*
-Private message:
-ea2ffd25	To 			25fd2fea
-68643c43	From		433c6468
-3c572524	Packet ID	2425573c
-ef			Flags		WantAck is set
-00			Hash
-0068
-2ce70ee8a8d5e651743013beb3324878ebf42df45158
-*/
+Unhandled packet:
+ffffffffc049a09e26904befe36f00689e32c760d0d0ac27d1973466dfe26517bb32155cb5
 
-/*
-Packet from Heltec V3:
+to        = 0xffffffff
+from      = 0x9ea049c0
+packet id = 0xef4b9026
+flags     = e3
+hash      = 6f
+align     = 00 68
+payload   = 9e32c760d0d0ac27d1973466dfe26517bb32155cb5
 
-ffffffff	To
-68643c43	From
-73e66127	Packet Id
-e7			Flasg
-08			Hash
-0068
-d40acbe7d253ff92ec
 */

@@ -16,6 +16,7 @@ type TextApplicationIncomingMessage struct {
 	Text      string       `json:"text"`
 	Rssi      int32        `json:"rssi"`
 	Snr       float32      `json:"snr"`
+	Hops      uint32       `json:"hops"`
 }
 
 type TextApplicationOutgoingMessage struct {
@@ -94,6 +95,7 @@ func (app *TextApplication) HandleIncomingPacket(meshPacket *pb.MeshPacket) erro
 			Text:      string(decoded.Decoded.Payload),
 			Rssi:      meshPacket.RxRssi,
 			Snr:       meshPacket.RxSnr,
+			Hops:      meshPacket.HopStart - meshPacket.HopLimit,
 		}
 
 		jsonMessage, err := json.Marshal(textMessage)
