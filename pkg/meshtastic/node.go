@@ -295,6 +295,7 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 		"SNR", fmt.Sprintf("%fdB", meshPacket.RxSnr),
 		"From", fmt.Sprintf("%x", meshPacket.From),
 		"To", fmt.Sprintf("%x", meshPacket.To),
+		"Hops", meshPacket.HopStart-meshPacket.HopLimit,
 		"Channel", meshPacket.Channel,
 		"PortNum", decoded.Decoded.Portnum,
 	).Debug("Received packet")

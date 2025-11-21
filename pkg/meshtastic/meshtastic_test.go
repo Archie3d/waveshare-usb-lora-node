@@ -139,4 +139,7 @@ hash      = 6f
 align     = 00 68
 payload   = 9e32c760d0d0ac27d1973466dfe26517bb32155cb5
 
+Unhandled packet:
+ffffffff978fd897debd1ab3615b0068256cd487989fabea47ecf2d56e1b09dd6d5f039a3cc2d76575da8151b0d7320780
+
 */
