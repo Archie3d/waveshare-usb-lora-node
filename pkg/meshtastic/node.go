@@ -308,34 +308,6 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 			}
 		}
 	}
-
-	/*
-		switch decoded.Decoded.Portnum {
-		case pb.PortNum_TEXT_MESSAGE_APP:
-			log.Debugf("TEXT MESSAGE from %x to %x: %s\n", meshPacket.From, meshPacket.To, decoded.Decoded.Payload)
-			if n.natsConn != nil {
-				n.natsConn.Publish("meshtastic.text", decoded.Decoded.Payload)
-			}
-		case pb.PortNum_NODEINFO_APP:
-			user := &pb.User{}
-			err := proto.Unmarshal(decoded.Decoded.Payload, user)
-			if err == nil {
-				log.Debugf("NODE INFO from %x: %v\n", meshPacket.From, user)
-			} else {
-				log.Debug("NODE INFO: unable to decode")
-			}
-		case pb.PortNum_TELEMETRY_APP:
-			telemetry := &pb.Telemetry{}
-			err := proto.Unmarshal(decoded.Decoded.Payload, telemetry)
-			if err == nil {
-				log.Debugf("TELEMETRY %x: %v\n", meshPacket.From, telemetry)
-			} else {
-				log.Debug("TELEMETRY: unable to decode")
-			}
-		default:
-			log.Printf("Unknown message: %v\n", decoded)
-		}
-	*/
 }
 
 func (n *Node) handleUnknownPacket(packet *client.PacketReceived) {
