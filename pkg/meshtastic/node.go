@@ -298,7 +298,7 @@ func (n *Node) handlePacket(meshPacket *pb.MeshPacket) {
 		"Hops", meshPacket.HopStart-meshPacket.HopLimit,
 		"Channel", meshPacket.Channel,
 		"PortNum", decoded.Decoded.Portnum,
-	).Debug("Received packet")
+	).Info("Received packet")
 
 	for _, app := range n.applications {
 		if app.GetPortNum() == decoded.Decoded.Portnum {
