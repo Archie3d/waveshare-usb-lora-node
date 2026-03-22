@@ -60,6 +60,12 @@ func (app *TextApplication) Start(natsConnection *nats.Conn, sink ApplicationMes
 			return
 		}
 
+		log.With(
+			"to", textMessage.To,
+			"channel", textMessage.ChannelId,
+			"text", textMessage.Text,
+		).Info("Sending text message")
+
 		err = app.messageSink.SendApplicationMessage(
 			textMessage.ChannelId,
 			textMessage.To,

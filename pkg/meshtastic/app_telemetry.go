@@ -160,6 +160,8 @@ func (app *TelemetryApplication) publishDeviceMetrics() {
 		return
 	}
 
+	log.With("uptime_seconds", uptimeSeconds).Info("Publishing device metrics telemetry")
+
 	app.messageSink.SendApplicationMessage(
 		app.config.Telemetry.DeviceMetrics.Channel, // Channel
 		types.NodeId(0xFFFFFFFF),                   // Broadcast

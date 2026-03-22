@@ -143,6 +143,7 @@ func (app *NodeInfoApplication) publishNodeInfo() {
 		return
 	}
 
+	log.With("short_name", user.ShortName, "long_name", user.LongName).Info("Publishing node info")
 	app.messageSink.SendApplicationMessage(
 		app.config.NodeInfo.Channel, // Channel
 		types.NodeId(0xFFFFFFFF),    // Broadcast

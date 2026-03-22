@@ -138,6 +138,12 @@ func (app *PositionApplication) publishNodePosition() {
 		return
 	}
 
+	log.With(
+		"latitude", app.config.Position.Latitude,
+		"longitude", app.config.Position.Longitude,
+		"altitude", app.config.Position.Altitude,
+	).Info("Publishing node position")
+
 	app.messageSink.SendApplicationMessage(
 		app.config.NodeInfo.Channel, // Channel
 		types.NodeId(0xFFFFFFFF),    // Broadcast

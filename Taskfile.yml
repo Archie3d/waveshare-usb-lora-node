@@ -11,10 +11,20 @@ tasks:
     cmds:
       - go build -o {{.OUTPUT_DIR}} ./...
 
+  build-linux-arm64:
+    deps: [make_target_dir, generate]
+    cmds:
+      - GOOS=linux GOARCH=arm64 go build -o {{.OUTPUT_DIR}} ./...
+
   release:
     deps: [make_target_dir, generate]
     cmds:
       - go  build -o {{.OUTPUT_DIR}} -ldflagd "-s -w" ./...
+
+  build-release-linux-arm64:
+    deps: [make_target_dir, generate]
+    cmds:
+      - GOOS=linux GOARCH=arm64 go build -o {{.OUTPUT_DIR}} -ldflags "-s -w" ./...
 
   test:
     cmds:

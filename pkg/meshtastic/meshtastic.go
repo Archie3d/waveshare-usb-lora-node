@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -98,12 +99,14 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 						} else {
 							c.Warnings <- fmt.Errorf("Device is busy, packet is scheduled for retransmission")
 							retransmissions.Add(1)
+
+							retransmitAfter := time.Duration(1000+rand.Uint32N(2000)) * time.Millisecond
 							go func() {
 								// Device is busy, trying again after some time
 								select {
 								case <-c.ctx.Done():
 									return
-								case <-time.After(1 * time.Second):
+								case <-time.After(retransmitAfter):
 									c.OutgoingPackets <- outgoingPacket
 									retransmissions.Add(-1)
 								}
