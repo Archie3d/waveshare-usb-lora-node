@@ -97,10 +97,10 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 						if retransmissions.Load() > 2 {
 							c.Errors <- fmt.Errorf("Too many retransmissions, packet dropped")
 						} else {
-							c.Warnings <- fmt.Errorf("Device is busy, packet is scheduled for retransmission")
 							retransmissions.Add(1)
+							c.Warnings <- fmt.Errorf("Device is busy, packet is scheduled for retransmission (%d pending)", retransmissions.Load())
 
-							retransmitAfter := time.Duration(1000+rand.Uint32N(2000)) * time.Millisecond
+							retransmitAfter := time.Duration(1000+rand.Uint32N(1000)) * time.Millisecond
 							go func() {
 								// Device is busy, trying again after some time
 								select {
@@ -112,6 +112,7 @@ func (c *MeshtasticClient) Open(portName string, radioConfig *RadioConfiguration
 								}
 							}()
 						}
+
 					} else {
 						c.Errors <- fmt.Errorf("packet transmission failed: %v", err)
 					}
@@ -324,7 +325,7 @@ func (c *MeshtasticClient) transmitPacket(packet []byte) error {
 	// Purge records of older packets
 	c.forgetOldSeenPackets()
 
-	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 3000, Data: packet, Busy: false}, 5*time.Second)
+	res, err := c.apiClient.SendRequest(&client.Transmit{Timeout_ms: 8000, Data: packet, Busy: false}, 5*time.Second)
 	if err != nil {
 		return err
 	}
