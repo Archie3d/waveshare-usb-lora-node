@@ -69,6 +69,8 @@ func (el *event_loop) processEvents() time.Duration {
 
 	for event != nil {
 
+		next_event := event.next
+
 		if time.Since(event.scheduledBy) > 0 {
 			// Event has expired - execute it
 			event.callback(el)
@@ -87,7 +89,7 @@ func (el *event_loop) processEvents() time.Duration {
 		}
 
 		// Move to the next event
-		event = event.next
+		event = next_event
 	}
 
 	if sleepDuration < 0 {
@@ -101,6 +103,8 @@ func (el *event_loop) processEvents() time.Duration {
 func (el *event_loop) enqueue(event *eventPoint) {
 	el.mutex.Lock()
 	defer el.mutex.Unlock()
+
+	event.next = nil
 
 	if el.eventQueue == nil {
 		el.eventQueue = event
